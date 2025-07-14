@@ -1,0 +1,48 @@
+x-default: &defaults
+    restart: unless-stopped
+    hostname: floral
+
+services:
+  node-exporter:
+    <<: *defaults
+    image: prom/node-exporter:latest
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - /:/host:ro,rslave
+    command: 
+      - "--path.rootfs=/host"
+      - "--path.procfs=/host/proc" 
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(dev|run|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)"
+    ports:
+      - 127.0.0.1:9100:9100
+    labels:
+      vm-job: "node-exporter"
+
+  mysqld-exporter:
+    <<: *defaults
+    image: prom/mysqld-exporter:latest
+    ports:
+      - 127.0.0.1:9104:9104
+    command:
+     - "--mysqld.username=$${database__connection__user}:$${database__connection__password}"
+     - "--mysqld.address=mysql:3306"
+    env_file: ../.env
+    labels:
+      vm-job: "mysql-exporter"
+
+  blackbox-exporter:
+    <<: *defaults
+    image: prom/blackbox-exporter:latest
+    ports:
+      - 127.0.0.1:9115:9115
+    volumes:
+      - ./configs/blackbox.yaml:/etc/blackbox_exporter/config.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Map "real" locahost in Docker container
+
+networks:
+  shared:
+    name: shared

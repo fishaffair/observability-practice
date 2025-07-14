@@ -1,0 +1,29 @@
+services:
+  ghost:
+    restart: unless-stopped
+    image: ghost:5-alpine
+    ports:
+      - 127.0.0.1:8080:2368 # Listen on Real "localhost" interface
+      - 172.17.0.1:8080:2368 # Listen on Docker "localhost" interface
+    env_file: ../.env
+    volumes:
+      - ghost:/var/lib/ghost/content
+    depends_on: 
+          - mysql
+
+  mysql:
+    restart: unless-stopped
+    image: mysql:8.0
+    env_file: ../.env
+    volumes:
+      - mysql:/var/lib/mysql
+    ports:
+      - 127.0.0.1:3306:3306
+
+volumes:
+  ghost: {}
+  mysql: {}
+
+networks:
+  shared:
+    name: shared
