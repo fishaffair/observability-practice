@@ -44,5 +44,6 @@ services:
       - "host.docker.internal:host-gateway" # Map "real" locahost in Docker container
 
 networks:
-  shared:
-    name: shared
+  default:
+    external:
+      name: observability

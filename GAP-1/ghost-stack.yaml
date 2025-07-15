@@ -9,7 +9,8 @@ services:
     volumes:
       - ghost:/var/lib/ghost/content
     depends_on: 
-          - mysql
+      mysql:
+        condition: service_healthy
 
   mysql:
     restart: unless-stopped
@@ -19,11 +20,14 @@ services:
       - mysql:/var/lib/mysql
     ports:
       - 127.0.0.1:3306:3306
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
 
 volumes:
   ghost: {}
   mysql: {}
 
 networks:
-  shared:
-    name: shared
+  default:
+    external:
+      name: observability

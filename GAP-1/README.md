@@ -22,9 +22,23 @@
 
 Дашборды в Grafana загружаются из папки `dashboards`, которая не включена в репозиторий по причине большого количества JSON кода.
 
-Запуск:
+### Настройка
+
+В `../.env` необходимо установить параметры:
 ```bash
-docker compose -f ghost-stack.yaml up
-docker compose -f vmetrics-stack.yaml up
-docker compose -f exporters-stack.yaml up
+database__client=
+database__connection__host=
+database__connection__user=
+database__connection__password=
+database__connection__database=
+GF_SECURITY_ADMIN_USER=
+GF_SECURITY_ADMIN_PASSWORD=
+MYSQL_ROOT_PASSWORD=
+```
+### Запуск
+```bash
+docker network create observability
+docker compose -f exporters-stack.yaml -p exporters up
+docker compose -f ghost-stack.yaml -p ghost up
+docker compose -f vmetrics-stack.yaml -p vmetrics up
 ```
