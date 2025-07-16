@@ -16,6 +16,8 @@ scrape_configs:
         target_label: __address__
         regex: (.+):\d+;(.+)
         replacement: $1:$2
+      - target_label: site
+        replacement: prod
 
   - job_name: 'blackbox-http'
     metrics_path: /probe
@@ -31,3 +33,5 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+      - target_label: site
+        replacement: prod

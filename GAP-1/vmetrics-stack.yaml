@@ -9,7 +9,7 @@ services:
     command:
       - "--storageDataPath=/storage"
       - "--httpListenAddr=:8428"
-      - "--retentionPeriod=7d"
+      - "--retentionPeriod=14d"
     labels:
        vm-job: victoriametrics
 
