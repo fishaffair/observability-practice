@@ -16,6 +16,10 @@ scrape_configs:
         target_label: __address__
         regex: (.+):\d+;(.+)
         replacement: $1:$2
+      - source_labels: [__meta_docker_container_name]
+        regex: '/(.+)'
+        target_label: instance
+        replacement: $1
       - target_label: site
         replacement: prod
 
