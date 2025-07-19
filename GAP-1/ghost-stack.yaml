@@ -5,7 +5,12 @@ services:
     ports:
       - 127.0.0.1:8080:2368 # Listen on Real "localhost" interface
       - 172.17.0.1:8080:2368 # Listen on Docker "localhost" interface
-    env_file: ../.env
+    environment:
+      - database__client=${GHOST_DB_CLIENT}
+      - database__connection__host=${GHOST_DB_HOSTNAME}
+      - database__connection__user=${GHOST_DB_USER}
+      - database__connection__password=${MYSQL_ROOT_PASSWORD}
+      - database__connection__database==${GHOST_DB_NAME}
     volumes:
       - ghost:/var/lib/ghost/content
     depends_on: 
@@ -15,7 +20,8 @@ services:
   mysql:
     restart: unless-stopped
     image: mysql:8.0
-    env_file: ../.env
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
     volumes:
       - mysql:/var/lib/mysql
     ports:
@@ -29,5 +35,5 @@ volumes:
 
 networks:
   default:
-    external:
-      name: observability
+    external: true
+    name: observability

@@ -26,10 +26,12 @@ services:
     image: prom/mysqld-exporter:latest
     ports:
       - 127.0.0.1:9104:9104
+    environment:
+      - DB_USER=${GHOST_DB_USER}
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD}
     command:
-     - "--mysqld.username=$${database__connection__user}:$${database__connection__password}"
+     - "--mysqld.username=$${DB_USER}:$${DB_PASSWORD}"
      - "--mysqld.address=mysql:3306"
-    env_file: ../.env
     labels:
       vm-job: "mysql-exporter"
 
@@ -45,5 +47,5 @@ services:
 
 networks:
   default:
-    external:
-      name: observability
+    external: true
+    name: observability

@@ -24,15 +24,15 @@
 
 ### Настройка
 
-В `../.env` необходимо установить параметры:
+В `.env` необходимо установить параметры:
 ```bash
-database__client=
-database__connection__host=
-database__connection__user=
-database__connection__password=
-database__connection__database=
-GF_SECURITY_ADMIN_USER=
-GF_SECURITY_ADMIN_PASSWORD=
+GHOST_DB_CLIENT=
+GHOST_DB_HOSTNAME=
+GHOST_DB_USER=
+MYSQL_ROOT_PASSWORD=
+GHOST_DB_NAME=
+GRAFANA_ADMIN=
+GRAFANA_PASSWORD=
 MYSQL_ROOT_PASSWORD=
 ```
 ### Запуск
