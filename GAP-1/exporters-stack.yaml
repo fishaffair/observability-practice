@@ -19,7 +19,7 @@ services:
     ports:
       - 127.0.0.1:9100:9100
     labels:
-      vm-job: "node-exporter"
+      prometheus-job: "node-exporter"
 
   mysqld-exporter:
     <<: *defaults
@@ -33,7 +33,7 @@ services:
      - "--mysqld.username=$${DB_USER}:$${DB_PASSWORD}"
      - "--mysqld.address=mysql:3306"
     labels:
-      vm-job: "mysql-exporter"
+      prometheus-job: "mysql-exporter"
 
   blackbox-exporter:
     <<: *defaults

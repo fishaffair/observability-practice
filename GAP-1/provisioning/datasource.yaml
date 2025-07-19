@@ -1,11 +1,26 @@
 apiVersion: 1
 
 datasources:
-    - name: VictoriaMetrics
+    - name: Mimir
       type: prometheus
       access: proxy
-      url: http://victoriametrics:8428
+      url: http://mimir:9009/prometheus
       isDefault: true
       jsonData:
-        prometheusType: Prometheus
-        prometheusVersion: 2.24.0
+        alertmanagerUid: "alertmanager"
+        httpHeaderName1: "X-Scope-OrgID"
+      secureJsonData:
+        httpHeaderValue1: "floral"
+      allowUiUpdates: true
+
+    - name: Mimir Alertmanager
+      uid: alertmanager
+      type: alertmanager
+      orgId: 1
+      url: http://mimir:9009
+      jsonData:
+        httpHeaderName1: "X-Scope-OrgID"
+        implementation: "mimir"
+      secureJsonData:
+        httpHeaderValue1: "floral"
+      allowUiUpdates: true

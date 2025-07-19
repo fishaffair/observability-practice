@@ -1,10 +1,8 @@
 ## GAP-1
 
-В качестве CMS был выбран проект [Ghost](https://github.com/TryGhost/Ghost), как альтератива популярного CMS WordPress. База данных -  MySQL. 
-
+В качестве CMS был выбран проект [Ghost](https://github.com/TryGhost/Ghost), как альтератива популярного CMS WordPress. База данных -  MySQL.
 Все сервисы работают локально (через locahost) и не выведены наружу портами.
-
-Для мониторинга была выбрана Vicrotia Metrics, так как в будущем она рассматривается и хотелось её сразу применить на практике. Для обнаружения target метрик используется автоматический docker service discovery.
+Для обнаружения target метрик используется автоматический docker service discovery. Долгосрочное хранение данных - Grafana Mimir. Алерты - встроенный в [Mimir Alertmanager](https://grafana.com/docs/mimir/latest/references/architecture/components/alertmanager/), полностью совместимый с Prometheus Alertmanager. В качестве сервсиса получения уведомлений - [Zenduty](https://zenduty.com/) через [Webhook](./configs/alertmanager.yaml).
 
 Текущая реализация выглядит так:
 
@@ -12,10 +10,10 @@
     - node-exporter
     - mysqld-exporter
     - blackbox-exporter
-* vmetrics-stack
+* metrics-stack
     - grafana
-    - vicrotiametrics
-    - vmagent
+    - prometheus
+    - mimir
 * ghost-stack
     - ghost
     - mysql
@@ -40,5 +38,7 @@ MYSQL_ROOT_PASSWORD=
 docker network create observability
 docker compose -f exporters-stack.yaml -p exporters up
 docker compose -f ghost-stack.yaml -p ghost up
-docker compose -f vmetrics-stack.yaml -p vmetrics up
+docker compose -f metrics-stack.yaml -p metrics up
+mimirtool rules load ./rules/node-exporter-rules.yaml --address=http://localhost:9009 --id=floral # Загружаем в Mimir tenant rules для алертов
+mimirtool alertmanager load ./configs/alertmanager.yaml --address=http://localhost:9009 --id=floral # Загружаем в Mimir tenant конфиг для AlertManager
 ```

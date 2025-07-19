@@ -1,13 +1,13 @@
 apiVersion: 1
 
 providers:
-- name: VMetrics
+- name: Mimir
   orgId: 1
-  folder: 'VMetrics'
+  folder: 'Mimir'
   type: file
   allowUiUpdates: true
   options:
-    path: /var/lib/grafana/dashboards/vmetrics
+    path: /var/lib/grafana/dashboards/mimir
 
 - name: Exporters
   orgId: 1

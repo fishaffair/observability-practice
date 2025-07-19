@@ -1,0 +1,67 @@
+services:
+  mimir:
+    image: grafana/mimir:latest
+    restart: unless-stopped
+    command: ["-config.file=/etc/mimir.yaml"]
+    depends_on:
+      - prometheus
+    volumes:
+      - ./configs/mimir.yaml:/etc/mimir.yaml
+      - ./configs/alertmanager.yaml:/etc/alertmanager.yaml # This is default (fallback) config for internal Mimir Alert Manager
+      - mimirdata:/data
+    ports:
+      - 127.0.0.1:9009:9009
+      - 127.0.0.1:8080:8080
+    labels:
+       prometheus-job: "floral/mimir"
+       prometheus-scrape-port: 9009
+
+  prometheus:
+    restart: unless-stopped
+    image: prom/prometheus:latest
+    user: root ### Neened to access to Docker Socket
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --log.level=error
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+    ports:
+      - 127.0.0.1:9090:9090
+    volumes:
+      -  prometheusdata:/prometheus
+      -  /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./configs/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./rules:/etc/prometheus/rules:ro
+    labels:
+       prometheus-job: prometheus
+
+  grafana:
+    restart: unless-stopped
+    image: grafana/grafana:12.0.2
+    depends_on:
+      - mimir
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_TIME_ZONE=Europe/Moscow
+      - GF_LOG_LEVEL=warning
+    ports:
+      - 127.0.0.1:3000:3000
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./provisioning/datasource.yaml:/etc/grafana/provisioning/datasources/single.yml
+      - ./provisioning/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./dashboards:/var/lib/grafana/dashboards
+
+volumes:
+  prometheusdata: {}
+  mimirdata: {}
+  grafanadata: {}
+
+networks:
+  default:
+    external: true
+    name: observability

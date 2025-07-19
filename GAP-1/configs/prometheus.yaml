@@ -1,18 +1,22 @@
 global:
   scrape_interval: 5s
+  external_labels:
+    cluster: floral
+    namespace: floral
+    deployment: floral
 
 scrape_configs:
   - job_name: "docker-containers"
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
     relabel_configs:
-      - source_labels: [__meta_docker_container_label_vm_job]
+      - source_labels: [__meta_docker_container_label_prometheus_job]
         regex: .+
         action: keep
-      - regex: __meta_docker_container_label_vm_(.+)
+      - regex: __meta_docker_container_label_prometheus_(.+)
         action: labelmap
         replacement: $1
-      - source_labels: [__address__, __meta_docker_container_label_vm_scrape_port]
+      - source_labels: [__address__, __meta_docker_container_label_prometheus_scrape_port]
         target_label: __address__
         regex: (.+):\d+;(.+)
         replacement: $1:$2
@@ -39,3 +43,11 @@ scrape_configs:
         replacement: blackbox-exporter:9115
       - target_label: site
         replacement: prod
+
+rule_files:
+  - /etc/prometheus/rules/*.yaml
+
+remote_write:
+  - url: http://mimir:9009/api/v1/push
+    headers:
+      X-Scope-OrgID: floral

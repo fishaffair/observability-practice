@@ -1,0 +1,34 @@
+global:
+  resolve_timeout: 1h
+route:
+  group_by: ['severity','alertname']
+  group_wait: 30s
+  group_interval: 30s
+  repeat_interval: 3h
+  receiver: 'null'
+
+  routes:
+  - receiver: 'zenduty_warning'
+    match:
+      severity: 'warning'
+  - receiver: 'zenduty_critical'
+    match:
+      severity: 'critical'
+
+receivers:
+- name: 'zenduty_warning'
+  webhook_configs:
+  - url: 'https://events.zenduty.com/AAABBBCCCDD'
+
+- name: 'zenduty_critical'
+  webhook_configs:
+  - url: 'https://events.zenduty.com/AAABBBCCCDD'
+
+- name: "null"
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
