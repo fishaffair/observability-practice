@@ -10,7 +10,7 @@ services:
       - database__connection__host=${GHOST_DB_HOSTNAME}
       - database__connection__user=${GHOST_DB_USER}
       - database__connection__password=${MYSQL_ROOT_PASSWORD}
-      - database__connection__database==${GHOST_DB_NAME}
+      - database__connection__database=${GHOST_DB_NAME}
     volumes:
       - ghost:/var/lib/ghost/content
     depends_on: 

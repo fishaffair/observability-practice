@@ -1,18 +1,10 @@
 apiVersion: 1
 
 providers:
-- name: Mimir
-  orgId: 1
-  folder: 'Mimir'
+- name: dashboards
   type: file
+  updateIntervalSeconds: 30
   allowUiUpdates: true
   options:
-    path: /var/lib/grafana/dashboards/mimir
-
-- name: Exporters
-  orgId: 1
-  folder: 'Exporters'
-  type: file
-  allowUiUpdates: true
-  options:
-    path: /var/lib/grafana/dashboards/exporters
+    path: /var/lib/grafana/dashboards
+    foldersFromFilesStructure: true
