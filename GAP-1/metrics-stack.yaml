@@ -38,7 +38,7 @@ services:
 
   grafana:
     restart: unless-stopped
-    image: grafana/grafana:12.0.2
+    image: grafana/grafana:latest
     depends_on:
       - mimir
       - prometheus
@@ -47,6 +47,20 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
       - GF_TIME_ZONE=Europe/Moscow
       - GF_LOG_LEVEL=warning
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_AUTH_GENERIC_OAUTH_ENABLED=true
+      - GF_AUTH_GENERIC_OAUTH_NAME=Login Keycloak
+      - GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP=true
+      - GF_AUTH_GENERIC_OAUTH_CLIENT_ID=grafana-oauth
+      - GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - GF_AUTH_GENERIC_OAUTH_SCOPES=openid email profile offline_access roles
+      - GF_AUTH_GENERIC_OAUTH_AUTH_URL=http://localhost:8989/realms/master/protocol/openid-connect/auth
+      - GF_AUTH_GENERIC_OAUTH_TOKEN_URL=http://keycloak:8989/realms/master/protocol/openid-connect/token
+      - GF_AUTH_GENERIC_OAUTH_API_URL=http://keycloak:8989/realms/master/protocol/openid-connect/userinfo
+      - GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH=@.email || @.preferred_username
+      - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(resource_access."grafana-oauth".roles[*], 'gf_admin') && 'Admin' || contains(resource_access."grafana-oauth".roles[*], 'editor') && 'Editor' || 'Viewer'
+      - GF_AUTH_GENERIC_OAUTH_TLS_SKIP_VERIFY_INSECURE=true
+      - GF_DATAPROXY_SEND_USER_HEADER=true
     ports:
       - 127.0.0.1:3000:3000
     volumes:
@@ -55,10 +69,32 @@ services:
       - ./provisioning/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
       - ./dashboards:/var/lib/grafana/dashboards
 
+  keycloak:
+      command: start-dev
+      image: quay.io/keycloak/keycloak:latest
+      environment:
+          - KC_LOG_LEVEL=INFO
+          - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_PASSWORD}
+          - KC_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_USERNAME}
+          - KC_HEALTH_ENABLED=true
+          - KC_HOSTNAME=http://localhost:8989
+          - KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true
+          - KC_HTTP_PORT=8989
+      healthcheck:
+          test: ['CMD-SHELL', '[ -f /tmp/HealthCheck.java ] || echo "public class HealthCheck { public static void main(String[] args) throws java.lang.Throwable { java.net.URI uri = java.net.URI.create(args[0]); System.exit(java.net.HttpURLConnection.HTTP_OK == ((java.net.HttpURLConnection)uri.toURL().openConnection()).getResponseCode() ? 0 : 1); } }" > /tmp/HealthCheck.java && java /tmp/HealthCheck.java http://localhost:9000/health/live']
+          interval: 10s
+          timeout: 5s
+          retries: 5
+      volumes: 
+        - keycloakdata:/opt/keycloak
+      ports:
+          - 127.0.0.1:8989:8989
+
 volumes:
   prometheusdata: {}
   mimirdata: {}
   grafanadata: {}
+  keycloakdata: {}
 
 networks:
   default:
