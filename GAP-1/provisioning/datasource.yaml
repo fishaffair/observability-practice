@@ -4,13 +4,19 @@ datasources:
     - name: Mimir
       type: prometheus
       access: proxy
-      url: http://mimir:9009/prometheus
+      url: http://nginx:9999/prometheus
       isDefault: true
+      allowUiUpdates: true
+
+    - name: MimirStrict
+      type: prometheus
+      access: proxy
+      url: http://mimir:9009/prometheus
       jsonData:
         alertmanagerUid: "alertmanager"
         httpHeaderName1: "X-Scope-OrgID"
       secureJsonData:
-        httpHeaderValue1: "floral"
+        httpHeaderValue1: floral
       allowUiUpdates: true
 
     - name: Mimir Alertmanager
@@ -18,9 +24,4 @@ datasources:
       type: alertmanager
       orgId: 1
       url: http://mimir:9009
-      jsonData:
-        httpHeaderName1: "X-Scope-OrgID"
-        implementation: "mimir"
-      secureJsonData:
-        httpHeaderValue1: "floral"
       allowUiUpdates: true

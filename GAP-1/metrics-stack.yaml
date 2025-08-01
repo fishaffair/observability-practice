@@ -90,6 +90,18 @@ services:
       ports:
           - 127.0.0.1:8989:8989
 
+  nginx:
+    image: docker.angie.software/angie:latest
+    ports:
+      - 127.0.0.1:9999:9999
+    volumes:
+      - ./configs/nginx.conf:/etc/angie/angie.conf
+    environment:
+      - ANGIE_LOAD_MODULES=angie-module-lua,ndk
+      - GRAFANA_TOKEN=${GRAFANA_TOKEN}
+    depends_on:
+      - mimir
+
 volumes:
   prometheusdata: {}
   mimirdata: {}
