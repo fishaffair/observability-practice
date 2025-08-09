@@ -1,0 +1,140 @@
+// discovery.docker "docker_containers" {
+// 	host = "unix:///var/run/docker.sock"
+// }
+
+// discovery.relabel "docker_containers" {
+// 	targets = discovery.docker.docker_containers.targets
+
+// 	rule {
+// 		source_labels = ["__meta_docker_container_label_prometheus_job"]
+// 		regex         = ".+"
+// 		action        = "keep"
+// 	}
+
+// 	rule {
+// 		regex  = "__meta_docker_container_label_prometheus_(.+)"
+// 		action = "labelmap"
+// 	}
+
+// 	rule {
+// 		source_labels = ["__address__", "__meta_docker_container_label_prometheus_scrape_port"]
+// 		regex         = "(.+):\\d+;(.+)"
+// 		target_label  = "__address__"
+// 		replacement   = "$1:$2"
+// 	}
+
+// 	rule {
+// 		source_labels = ["__meta_docker_container_name"]
+// 		regex         = "/(.+)"
+// 		target_label  = "instance"
+// 	}
+
+// 	rule {
+// 		target_label = "site"
+// 		replacement  = "prod"
+// 	}
+// }
+
+// prometheus.scrape "docker_containers" {
+// 	targets         = discovery.relabel.docker_containers.output
+// 	forward_to      = [prometheus.remote_write.mimir.receiver]
+// 	job_name        = "docker-containers"
+// 	scrape_interval = "5s"
+// 	scrape_timeout  = "5s"
+// }
+
+discovery.relabel "blackbox_http" {
+	targets = [{
+		__address__ = "http://host.docker.internal:8080",
+	}]
+
+	rule {
+		source_labels = ["__address__"]
+		target_label  = "__param_target"
+	}
+
+	rule {
+		source_labels = ["__param_target"]
+		target_label  = "instance"
+	}
+
+	rule {
+		target_label = "__address__"
+		replacement  = "blackbox-exporter:9115"
+	}
+
+	rule {
+		target_label = "site"
+		replacement  = "prod"
+	}
+}
+
+prometheus.scrape "blackbox_http" {
+	targets    = discovery.relabel.blackbox_http.output
+	forward_to = [prometheus.remote_write.mimir.receiver]
+	job_name   = "blackbox-http"
+	params     = {
+		module = ["http_2xx"],
+	}
+	scrape_interval = "5s"
+	scrape_timeout  = "5s"
+	metrics_path    = "/probe"
+}
+
+prometheus.exporter.mysql "mysql" {
+  data_source_name  = sys.env("DB_USER") + ":" + sys.env("DB_PASSWORD") + "@(mysql:3306)/"
+}
+
+prometheus.exporter.cadvisor "cadvisor" {
+  docker_host = "unix:///var/run/docker.sock"
+  storage_duration = "5m"
+}
+
+discovery.relabel "cadvisor" {
+    targets = prometheus.exporter.cadvisor.cadvisor.targets
+    rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+    }
+}
+
+prometheus.exporter.unix "node_exporter" { 
+    rootfs_path = "/rootfs"
+}
+
+discovery.relabel "node_exporter" {
+  targets = prometheus.exporter.unix.node_exporter.targets
+  rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+  }
+}
+
+prometheus.exporter.self "alloy_metrics" { }
+
+prometheus.scrape "exporters" {
+  targets = array.concat(
+    discovery.relabel.node_exporter.output,
+    discovery.relabel.cadvisor.output,
+    prometheus.exporter.self.alloy_metrics.targets,
+	prometheus.exporter.mysql.mysql.targets,
+  )
+  forward_to = [ prometheus.remote_write.mimir.receiver ]
+}
+
+prometheus.remote_write "mimir" {
+	external_labels = {
+		cluster    = "entity",
+		deployment = "entity",
+		namespace  = "entity",
+        instance = "entity",
+	}
+	endpoint {
+		url     = "http://mimir:9009/api/v1/push"
+		headers = {
+			"X-Scope-OrgID" = "entity",
+		}
+		queue_config { }
+		metadata_config { }
+	}
+}

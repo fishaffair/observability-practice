@@ -3,7 +3,10 @@
 В качестве CMS был выбран проект [Ghost](https://github.com/TryGhost/Ghost), как альтератива популярного CMS WordPress. База данных -  MySQL.
 Все сервисы работают локально (через locahost) и не выведены наружу портами.
 Для обнаружения target метрик используется автоматический docker service discovery. Долгосрочное хранение данных - Grafana Mimir. Алерты - встроенный в [Mimir Alertmanager](https://grafana.com/docs/mimir/latest/references/architecture/components/alertmanager/), полностью совместимый с Prometheus Alertmanager. В качестве сервсиса получения уведомлений - [Zenduty](https://zenduty.com/) через [Webhook](./configs/alertmanager.yaml). 
-Nginx (Angie) используется как multitenant-proxy, который преобразует ID организации Grafana в имя тенанта от которого делается PromQL запрос в Mimir через небольшой lua скрипт.
+Nginx (Angie) используется как multitenant-proxy, который преобразует ID организации Grafana в имя тенанта от которого делается PromQL запрос в Mimir через небольшой lua скрипт. 
+Для сбора метрик с первого тенанта (floral) - ипользуется prometheus + exporters stack. 
+Для второго тенанта (entity) - ипользуется Grafana Alloy.
+Окончательный сбор метрик по обоим тенантам аггрегируется в Mimir.
 
 Текущая реализация выглядит так:
 
@@ -15,6 +18,7 @@ Nginx (Angie) используется как multitenant-proxy, который 
     - grafana
     - prometheus
     - mimir
+    - alloy
     - angie
 * ghost-stack
     - ghost
@@ -34,8 +38,8 @@ GHOST_DB_NAME=
 GRAFANA_ADMIN=
 GRAFANA_PASSWORD=
 MYSQL_ROOT_PASSWORD=
-GRAFANA_TOKEN=
 ```
+
 ### Запуск
 ```bash
 docker network create observability

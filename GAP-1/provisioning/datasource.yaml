@@ -22,6 +22,13 @@ datasources:
     - name: Mimir Alertmanager
       uid: alertmanager
       type: alertmanager
-      orgId: 1
       url: http://mimir:9009
+      allowUiUpdates: true
+
+    - name: MimirORG3
+      type: prometheus
+      access: proxy
+      url: http://nginx:9999/prometheus
+      isDefault: true
+      orgId: 3
       allowUiUpdates: true

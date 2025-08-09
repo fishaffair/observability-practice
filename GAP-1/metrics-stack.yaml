@@ -98,8 +98,33 @@ services:
       - ./configs/nginx.conf:/etc/angie/angie.conf
     environment:
       - ANGIE_LOAD_MODULES=angie-module-lua,ndk
-      - GRAFANA_TOKEN=${GRAFANA_TOKEN}
+      - GRAFANA_BASIC_AUTH=${GRAFANA_ADMIN}:${GRAFANA_PASSWORD}
     depends_on:
+      - mimir
+
+  alloy:
+   image: grafana/alloy:latest
+   privileged: true
+   ports:
+     - 127.0.0.1:12345:12345
+     - 127.0.0.1:4317:4317
+     - 127.0.0.1:4318:4318
+   environment:
+      - ALLOY_DEPLOY_MODE=docker
+      - DB_USER=${GHOST_DB_USER}
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD}
+   volumes:
+      - ./configs/config.alloy:/etc/alloy/config.alloy
+      - /proc:/rootproc:ro
+      - /var/run/docker.sock.raw:/var/run/docker.sock
+      - /sys:/sys:ro
+      - /:/rootfs:ro
+      - /dev/disk/:/dev/disk:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+   command: run --disable-reporting --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy 
+   extra_hosts:
+        - "host.docker.internal:host-gateway" # Map "real" locahost in Docker container
+   depends_on:
       - mimir
 
 volumes:
