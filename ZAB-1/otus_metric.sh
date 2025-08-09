@@ -1,0 +1,1 @@
+awk 'BEGIN{srand(); print int(rand()*101)}'

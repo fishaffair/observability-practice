@@ -1,0 +1,98 @@
+
+services:
+  postgres:
+    image: postgres:15
+    volumes:
+      - zabbix-postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${ZABBIX_DB_NAME}
+      POSTGRES_USER: ${ZABBIX_DB_USER}
+      POSTGRES_PASSWORD: ${ZABBIX_DB_PASSWORD}
+    networks:
+      - zabbix-network
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "${ZABBIX_DB_NAME}", "-U", "${ZABBIX_DB_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql
+    environment:
+      DB_SERVER_HOST: postgres
+      DB_SERVER_PORT: 5432
+      POSTGRES_DB: ${ZABBIX_DB_NAME}
+      POSTGRES_USER: ${ZABBIX_DB_USER}
+      POSTGRES_PASSWORD: ${ZABBIX_DB_PASSWORD}
+    networks:
+      - zabbix-network
+    ports:
+      - "10051:10051"
+    healthcheck:
+      test: grep -qr "zabbix_server" /proc/*/status || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    volumes:
+      - zabbix-export:/var/lib/zabbix/export
+      - zabbix-snmptraps:/var/lib/zabbix/snmptraps
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  zabbix-dashboard:
+    image: zabbix/zabbix-web-nginx-pgsql
+    environment:
+      DB_SERVER_HOST: postgres
+      DB_SERVER_PORT: 5432
+      POSTGRES_DB: ${ZABBIX_DB_NAME}
+      POSTGRES_USER: ${ZABBIX_DB_USER}
+      POSTGRES_PASSWORD: ${ZABBIX_DB_PASSWORD}
+      ZBX_SERVER_HOST: zabbix-server
+      PHP_TZ: ${ZABBIX_TIMEZONE}
+    networks:
+      - zabbix-network
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      zabbix-server:
+        condition: service_healthy
+
+  zabbix-agent:
+    image: zabbix/zabbix-agent2
+    hostname: zabbix-agent
+    environment:
+      ZBX_HOSTNAME: Zabbix server
+      ZBX_SERVER_HOST: zabbix-server
+    networks:
+      - zabbix-network
+    restart: unless-stopped
+    volumes:
+      - ./otus.conf:/etc/zabbix/zabbix_agentd.d/userparameter_otus.conf:ro
+      - ./otus_metric.sh:/usr/local/bin/otus_metric.sh
+      - ./otus_discovery.sh:/usr/local/bin/otus_discovery.sh
+    depends_on:
+      - postgres
+      - zabbix-server
+
+networks:
+  zabbix-network:
+    external: true
+
+volumes:
+  zabbix-postgres: {}
+  zabbix-export: {}
+  zabbix-snmptraps: {}
