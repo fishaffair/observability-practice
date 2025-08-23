@@ -1,0 +1,113 @@
+x-default: &defaults
+    restart: unless-stopped
+    hostname: floral
+
+include:
+  - ../GAP-1/ghost-stack.yaml
+
+services:
+  influxdb:
+    <<: *defaults
+    image: influxdb:latest
+    container_name: influxdb
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_INIT_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_INIT_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_INIT_BUCKET}
+      - DOCKER_INFLUXDB_INIT_RETENTION=${INFLUX_INIT_RETENTION}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_INIT_ADMIN_TOKEN}
+      - INFLUXDB_REPORTING_DISABLED=true
+    ports:
+      - "127.0.0.1:8086:8086"
+    volumes:
+      - influxdb2-data:/var/lib/influxdb2
+      - influxdb2-config:/etc/influxdb2
+      - ./configs/alerts:/etc/alerts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSf -H \"Authorization: Token $${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}\" http://localhost:8086/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 2
+      start_period: 5s
+
+  telegraf:
+    <<: *defaults
+    image: telegraf:latest
+    container_name: telegraf
+    user: telegraf:996
+    environment:
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=${INFLUX_INIT_ADMIN_TOKEN}
+      - INFLUX_ORG=${INFLUX_INIT_ORG}
+      - INFLUX_BUCKET=${INFLUX_INIT_BUCKET}
+      - HOST_ETC=/hostfs/etc 
+      - HOST_PROC=/hostfs/proc 
+      - HOST_SYS=/hostfs/sys 
+      - HOST_VAR=/hostfs/var 
+      - HOST_RUN=/hostfs/run 
+      - HOST_MOUNT_PREFIX=/hostfs 
+      - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_USERNAME=${GHOST_DB_USER}
+    volumes:
+      - ./configs/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /:/hostfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Map "real" locahost in Docker container
+
+  chronograf:
+    <<: *defaults
+    image: chronograf:latest
+    container_name: chronograf
+    environment:
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=${INFLUX_INIT_ADMIN_TOKEN}
+      - INFLUXDB_ORG=${INFLUX_INIT_ORG}
+      - CHRONOGRAF_USER=${CHRONOGRAF_USER}
+      - CHRONOGRAF_PASS=${CHRONOGRAF_PASS}
+    ports:
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - chronograf-data:/var/lib/chronograf
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSf http://localhost:8888/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  kapacitor:
+    <<: *defaults
+    image: kapacitor:latest
+    container_name: kapacitor
+    environment:
+      - INFLUX_TOKEN=${INFLUX_INIT_ADMIN_TOKEN}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    ports:
+      - "127.0.0.1:9092:9092"
+    volumes:
+      - kapacitor-data:/var/lib/kapacitor
+      - ./configs/kapacitor.conf:/etc/kapacitor/kapacitor.conf:ro
+    depends_on:
+      influxdb:
+        condition: service_healthy
+
+volumes:
+  influxdb2-config: {}
+  influxdb2-data: {}
+  chronograf-data: {}
+  kapacitor-data: {}
+
+networks:
+  default:
+    external: true
+    name: observability
