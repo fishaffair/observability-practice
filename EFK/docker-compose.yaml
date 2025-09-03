@@ -1,0 +1,131 @@
+x-depends: &depends_on
+  depends_on:
+    elasticsearch:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  elasticsearch:
+    image: elasticsearch:9.1.3
+    container_name: elasticsearch
+    labels:
+      co.elastic.logs/module: elasticsearch
+    environment:
+      - node.name=es-single
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - cluster.name=docker-cluster
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.enabled=true
+      - logger.level=ERROR
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
+    volumes:
+      - elasticsearchdata:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS --fail $${ELASTICSEARCH_HOSTS}/_cluster/health?wait_for_status=yellow -u $${ELASTIC_USERNAME}:$${ELASTIC_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  kibana:
+    image: kibana:9.1.3
+    container_name: kibana
+    labels:
+      co.elastic.logs/module: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
+      - ELASTICSEARCH_USERNAME=kibana
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+      - LOGGING_ROOT_LEVEL=error
+      - XPACK_SECURITY_ENABLED=true
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${ENCRYPTIONKEY}
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_KEYROTATION_DECRYPTIONONLYKEYS[0]=${DECRYPTIONONLYKEYS_0}
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_KEYROTATION_DECRYPTIONONLYKEYS[1]=${DECRYPTIONONLYKEYS_1}
+    ports:
+      - "127.0.0.1:5601:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS --fail http://localhost:5601/api/status || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    <<: *depends_on
+
+  heartbeat:
+    image: elastic/heartbeat:9.1.3
+    container_name: heartbeat
+    volumes:
+      - ./heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - GHOST_URL=${GHOST_URL}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - KIBANA_HOSTS=http://kibana:5601
+    command:
+      - --strict.perms=false
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Map "real" locahost in Docker container
+    <<: *depends_on
+
+  filebeat:
+    image: elastic/filebeat:9.1.3
+    user: root
+    container_name: filebeat
+    volumes:
+      - filebeatdata:/usr/share/filebeat/data
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - ELASTIC_USER=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTIC_HOSTS=${ELASTICSEARCH_HOSTS}
+      - KIBANA_HOSTS=http://kibana:5601
+    command:
+      - --strict.perms=false
+    <<: *depends_on
+  metricbeat:
+    hostname: floral
+    container_name: metricbeat
+    image: elastic/metricbeat:9.1.3
+    user: root # For capturing docker metrics
+    cgroup: host
+    privileged: true
+    volumes:
+      - metricbeatdata:/usr/share/metricbeat/data
+      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+      - /proc:/hostfs/proc:ro
+      - /:/hostfs:ro
+    environment:
+      - ELASTIC_USER=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTIC_HOSTS=${ELASTICSEARCH_HOSTS}
+      - KIBANA_HOSTS=http://kibana:5601
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    command:
+      - --strict.perms=false
+      - --system.hostfs=/hostfs
+    <<: *depends_on
+
+volumes:
+  elasticsearchdata: {}
+  filebeatdata: {}
+  metricbeatdata: {}
+
+networks:
+  default:
+    external: true
+    name: observability

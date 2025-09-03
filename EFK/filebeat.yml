@@ -1,0 +1,35 @@
+filebeat.config:
+  modules:
+    path: ${path.config}/modules.d/*.yml
+    reload.enabled: true
+
+filebeat.autodiscover:
+  providers:
+  - type: docker
+    hints.enabled: true
+    host: "unix:///var/run/docker.sock"
+    hints.default_config:
+      type: filestream
+      id: container-${data.container.id}
+      prospector.scanner.symlinks: true
+      parsers:
+        - container: ~
+      paths:
+        - /var/lib/docker/containers/${data.container.id}/*.log
+
+processors:
+- add_docker_metadata:
+    host: "unix:///var/run/docker.sock"
+
+output.elasticsearch:
+  hosts: ${ELASTIC_HOSTS}
+  username: ${ELASTIC_USER}
+  password: ${ELASTIC_PASSWORD}
+
+setup.kibana:
+  host: ${KIBANA_HOSTS}
+  username: ${ELASTIC_USER}
+  password: ${ELASTIC_PASSWORD} 
+  
+logging.level: error
+logging.to_stderr: true

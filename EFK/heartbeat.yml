@@ -1,0 +1,27 @@
+heartbeat.monitors:
+  - type: http
+    id: ghost
+    name: Ghost CMS Status
+    hosts: ["${GHOST_URL}"]
+    check.response.status: [200]
+    schedule: '@every 5s' 
+
+  - type: tcp
+    id: mysql_tcp
+    name: MySQL TCP monitor
+    hosts: ["${MYSQL_HOST}:${MYSQL_PORT}"]
+    schedule: "@every 30s"
+    timeout: 10s
+
+output.elasticsearch:
+  hosts: ["${ELASTICSEARCH_HOSTS}"]
+  username: ${ELASTIC_USERNAME}
+  password: ${ELASTIC_PASSWORD}
+
+setup.kibana:
+  host: ${KIBANA_HOSTS}
+  username: ${ELASTIC_USER}
+  password: ${ELASTIC_PASSWORD} 
+
+logging.level: error
+logging.to_stderr: true
