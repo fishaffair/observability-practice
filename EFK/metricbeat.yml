@@ -57,10 +57,10 @@ metricbeat.modules:
     - "event"
     - "healthcheck"
     - "info"
-    #- "image"
+    - "image"
     - "memory"
     - "network"
-    #- "network_summary"
+    - "network_summary"
   hosts: ["unix:///var/run/docker.sock"]
   period: 10s
   enabled: true
@@ -73,11 +73,6 @@ output.elasticsearch:
  hosts: ${ELASTIC_HOSTS}
  username: ${ELASTIC_USER}
  password: ${ELASTIC_PASSWORD}
-#  index: "metrics"
-
-# output.elasticsearch.index: "metrics"
-# setup.template.name: "metrics"
-# setup.template.pattern: "metrics"
 
 logging.level: warning
 logging.to_stderr: true

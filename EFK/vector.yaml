@@ -1,0 +1,39 @@
+api:
+  enabled: true
+
+data_dir: /var/lib/vector
+
+sources:
+  docker_logs:
+    type: docker_logs
+
+transforms:
+  docker_dedot: # https://github.com/vectordotdev/vector/issues/5881
+    type: remap
+    inputs: 
+      - docker_logs
+    source: |
+        . = map_keys(., recursive: true) -> |key| { replace(key, ".", "_") }
+  parse_docker_logs:
+      type: remap
+      inputs:
+        - docker_dedot
+      source: |
+        match = parse_regex!(.message, r'(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z?)\s+(?P<thread>\d+)\s+\[(?P<level>[^\]]+)\]\s+\[(?P<code>[^\]]+)\]\s+\[(?P<component>[^\]]+)\]\s+(?P<message>[^\\]+)')
+        match = parse_regex!(.message, r'^(?:\[(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s*)?(?P<level>[A-Z]+)\s+(?P<message>.+)$')
+        . = merge(., match)
+
+sinks:
+  elastic:
+    type: elasticsearch
+    inputs:
+      - parse_docker_logs
+    endpoint: "http://elasticsearch:9200"
+    bulk:
+      index: "vector-%Y.%m.%d"
+    compression: gzip
+    healthcheck: true
+    auth:
+      strategy: "basic"
+      password: "${ELASTIC_PASSWORD}"
+      user: "${ELASTIC_USER}"

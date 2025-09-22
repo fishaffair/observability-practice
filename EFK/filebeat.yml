@@ -21,10 +21,13 @@ processors:
 - add_docker_metadata:
     host: "unix:///var/run/docker.sock"
 
-output.elasticsearch:
-  hosts: ${ELASTIC_HOSTS}
-  username: ${ELASTIC_USER}
-  password: ${ELASTIC_PASSWORD}
+# output.elasticsearch:
+#   hosts: ${ELASTIC_HOSTS}
+#   username: ${ELASTIC_USER}
+#   password: ${ELASTIC_PASSWORD}
+
+output.logstash:
+  hosts: ["logstash:5044"]
 
 setup.kibana:
   host: ${KIBANA_HOSTS}

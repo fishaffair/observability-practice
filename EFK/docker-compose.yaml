@@ -21,7 +21,7 @@ services:
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - ELASTIC_USERNAME=${ELASTIC_USERNAME}
       - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS}
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
     ports:
       - "127.0.0.1:9200:9200"
       - "127.0.0.1:9300:9300"
@@ -78,8 +78,10 @@ services:
 
   filebeat:
     image: elastic/filebeat:9.1.3
-    user: root
+    user: root # For capturing docker container logs
     container_name: filebeat
+    labels:
+      - co.elastic.logs/enabled=false # Disable filebeat self log-scrubbing to prevent log looping
     volumes:
       - filebeatdata:/usr/share/filebeat/data
       - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
@@ -104,7 +106,7 @@ services:
       - metricbeatdata:/usr/share/metricbeat/data
       - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
       - /proc:/hostfs/proc:ro
       - /:/hostfs:ro
@@ -118,6 +120,35 @@ services:
     command:
       - --strict.perms=false
       - --system.hostfs=/hostfs
+
+  logstash:
+    container_name: logstash
+    image: elastic/logstash:9.1.3
+    ports:
+      - "127.0.0.1:5044:5044" 
+    environment:
+      - ELASTIC_USER=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTIC_HOSTS=${ELASTICSEARCH_HOSTS}
+      - LOG_LEVEL=error
+      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+    volumes:
+      - ./logstash-pipeline.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL","curl -sS http://localhost:9600/_node/pipelines || exit 1"]
+    <<: *depends_on
+
+  vector:
+    image: timberio/vector:nightly-alpine
+    container_name: vector
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - ELASTIC_USER=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    ports:
+      - "127.0.0.1:8686:8686"
     <<: *depends_on
 
 volumes:
