@@ -1,0 +1,49 @@
+api:
+  enabled: true
+
+data_dir: /var/lib/vector
+
+sources:
+  docker_logs:
+    type: docker_logs
+    include_labels:
+      - vector.enabled=true
+
+transforms:
+  docker_parser:
+    type: remap
+    inputs: 
+      - docker_logs # Delete unused labels
+    source: |
+        del(.container_created_at)
+        del(.container_id)
+        del(.stream)
+        del(.source.type)
+        del(.label."com.docker.compose.image")
+        del(.label."com.docker.compose.oneoff")
+        del(.label."com.docker.compose.depends_on")
+        del(.label."com.docker.compose.version")
+        del(.label."com.docker.compose.container-number")
+        del(.label."com.docker.compose.config-hash")
+        del(.label."com.docker.compose.project.config_files")
+        del(.label."com.docker.compose.project.working_dir")
+        del(.label."label.com.docker.compose.replace")
+
+sinks:
+  loki:
+    type: loki
+    compression: gzip
+    encoding:
+      codec: json
+    out_of_order_action: accept
+    labels:
+      service_name: "{{ label.\"com.docker.compose.service\" }}"
+      compose_project: "{{ label.\"com.docker.compose.project\" }}"
+      source: vector
+    structured_metadata:
+      image: "{{ image }}"
+    tenant_id: "{{ label.\"org.tenant.name\" }}"
+    inputs:
+      - docker_parser
+        # - docker_logs
+    endpoint: http://loki:3100
