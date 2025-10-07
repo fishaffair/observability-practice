@@ -1,0 +1,21 @@
+fluentbit-to-opensearch:
+  source:
+    http:
+      port: 2021
+      ssl: false
+      health_check_service: true
+      unauthenticated_health_check: true
+
+  processor:
+    - date:
+        from_time_received: true
+        destination: "@timestamp"
+
+  sink:
+    - opensearch:
+        hosts: ["http://opensearch:9200"]
+        username: "${OPENSEARCH_USERNAME}"
+        password: "${OPENSEARCH_PASSWORD}"
+        insecure: true
+        index_type: custom
+        index: "data-prepper"

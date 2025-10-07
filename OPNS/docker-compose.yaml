@@ -1,0 +1,107 @@
+x-logging: &logging
+  logging:
+    driver: "fluentd"
+    options:
+      fluentd-async: 'true'
+      fluentd-address: localhost:24224
+      tag: docker
+
+# https://github.com/fluent/fluent-bit/issues/5792
+
+name: opensearch
+services:
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch
+    environment:
+      - cluster.name=opensearch-cluster 
+      - node.name=opensearch-docker 
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD}
+      - OPENSEARCH_USERNAME=${OPENSEARCH_USERNAME}
+      - OPENSEARCH_HOSTS=${OPENSEARCH_HOSTS}
+      - plugins.security.ssl.http.enabled=false
+      - logger.level=warn
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - 127.0.0.1:9200:9200 
+      - 127.0.0.1:9600:9600
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -k --fail $${OPENSEARCH_HOSTS}/_cluster/health -u $${OPENSEARCH_USERNAME}:$${OPENSEARCH_INITIAL_ADMIN_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  dashboard:
+    restart: always
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: dashboard
+    volumes:
+      - ./opensearch_dashboards.yaml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml
+    ports:
+      - 127.0.0.1:5601:5601
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS --fail http://localhost:5601 || exit 1"]
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
+  fluent-bit:
+    container_name: fluentbit
+    image: fluent/fluent-bit
+    environment:
+      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD}
+      - OPENSEARCH_USERNAME=${OPENSEARCH_USERNAME}
+    volumes:
+      - ./fluent-bit.yaml:/fluent-bit/etc/fluent-bit.yaml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - 127.0.0.1:24224:24224
+    command: -c /fluent-bit/etc/fluent-bit.yaml
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
+  data-prepper:
+    image: opensearchproject/data-prepper:latest
+    container_name: data-prepper
+    volumes:
+      - ./data-prepper-pipeline.yaml:/usr/share/data-prepper/pipelines/pipeline.yaml:ro
+    environment:
+      - logger.level=warn
+      - "JAVA_OPTS=-Xms256m -Xmx256m"
+      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD}
+      - OPENSEARCH_USERNAME=${OPENSEARCH_USERNAME}
+    ports:
+      - "127.0.0.1:2021:2021"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS http://localhost:2021/health || exit 1"]
+    depends_on:
+      opensearch:
+        condition: service_healthy
+
+  ghost:
+    extends:
+      file: ../GAP-1/ghost-stack.yaml
+      service: ghost
+    <<: *logging
+
+  mysql:
+    extends:
+      file: ../GAP-1/ghost-stack.yaml
+      service: mysql
+    <<: *logging
+
+volumes:
+  opensearch-data: {}
+  ghost: {}
+  mysql: {}
+
+networks:
+  default:
+    external: true
+    name: observability

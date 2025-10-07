@@ -1,0 +1,29 @@
+service:
+  log_level: warn
+  daemon: off
+  parsers_file: /fluent-bit/etc/parsers.conf
+
+pipeline:
+  inputs:
+    - name: forward
+      listen: 0.0.0.0
+      port: 24224
+
+  outputs:
+    - name: opensearch
+      match: '*'
+      host: opensearch
+      port: 9200
+      http_user: ${OPENSEARCH_USERNAME}
+      http_passwd: ${OPENSEARCH_PASSWORD}
+      tls: off
+      suppress_type_name: on
+      replace_dots: on
+      index: fluent-bit
+
+    - name: http
+      host: data-prepper
+      port: 2021
+      tls: off
+      uri: /log/ingest
+      match: '*'
