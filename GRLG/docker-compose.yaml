@@ -1,0 +1,108 @@
+
+name: graylog
+services:
+  mongodb:
+    image: mongo:7.0
+    restart: on-failure
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    ports:
+      - 127.0.0.1:27017:27017
+
+  datanode:
+    image: graylog/graylog-datanode:6.3
+    hostname: datanode
+    environment:
+      GRAYLOG_DATANODE_NODE_ID_FILE: /var/lib/graylog-datanode/node-id
+      GRAYLOG_DATANODE_PASSWORD_SECRET: ${GRAYLOG_PASSWORD_SECRET}
+      GRAYLOG_DATANODE_MONGODB_URI: mongodb://mongodb:27017/graylog
+      GRAYLOG_LOG_LEVEL: WARN
+      JAVA_OPTS: "-Xms256m -Xmx256m"
+    ulimits:
+      memlock:
+        hard: -1
+        soft: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - 127.0.0.1:8999:8999/tcp  # DataNode API
+      - 127.0.0.1:9200:9200/tcp
+      - 127.0.0.1:9300:9300/tcp 
+    volumes:
+      - graylog-datanode:/var/lib/graylog-datanode
+  graylog:
+    hostname: server
+    image: graylog/graylog:6.3
+    depends_on:
+      mongodb:
+        condition: service_started
+      datanode:
+        condition: service_started
+    entrypoint: "/usr/bin/tini --  /docker-entrypoint.sh"
+    environment:
+      GRAYLOG_NODE_ID_FILE: "/usr/share/graylog/data/data/node-id"
+      GRAYLOG_PASSWORD_SECRET: "${GRAYLOG_PASSWORD_SECRET}"
+      GRAYLOG_ROOT_PASSWORD_SHA2: "${GRAYLOG_ROOT_PASSWORD_SHA2}"
+      GRAYLOG_HTTP_BIND_ADDRESS: "0.0.0.0:9000"
+      GRAYLOG_HTTP_EXTERNAL_URI: "http://localhost:9000/"
+      GRAYLOG_MONGODB_URI: "mongodb://mongodb:27017/graylog"
+      GRAYLOG_LOG_LEVEL: WARN
+      JAVA_OPTS: "-Xms256m -Xmx256m"
+    ports:
+    - 127.0.0.1:5044:5044   # Beats
+    # - 127.0.0.1:5140:5140/udp   # Syslog
+    # - 127.0.0.1:5140:5140/tcp   # Syslog
+    # - 127.0.0.1:5555:5555/tcp   # RAW TCP
+    # - 127.0.0.1:5555:5555/udp   # RAW UDP
+    - 127.0.0.1:9000:9000/tcp   # Server API
+    # - 127.0.0.1:12201:12201/tcp # GELF TCP
+    # - 127.0.0.1:12201:12201/udp # GELF UDP
+    # - 127.0.0.1:13301:13301/tcp # Forwarder data
+    # - 127.0.0.1:13302:13302/tcp # Forwarder config
+    volumes:
+      - graylog_data:/usr/share/graylog/data
+
+  graylog-sidecar:
+    image: zsonbi/graylog-sidecar # using unofficial docker image, as there is no official sidecar for Docker from Graylog
+    container_name: graylog-sidecar
+    restart: unless-stopped
+    volumes:
+        - sidecar:/var/lib/graylog-sidecar/generated:rw
+    environment:
+      LOGGER_IP: 127.0.0.1 # optional if it is a standalone container isn't needed
+      GRAYLOG_TOKEN: ${GRAYLOG_TOKEN} # The token you get from the server under the sidecars menu
+      GRAYLOG_SIDECAR_NAME: scrapper # The name the sidecar will be displayed in the core (useful for streams as well)
+      GRAYLOG_SERVER: http://graylog:9000/api # The address of the graylog server
+    depends_on:
+      filebeat:
+        condition: service_started
+      graylog:
+        condition: service_started
+
+  filebeat:
+    image: elastic/filebeat:9.1.3
+    user: root # For capturing docker container logs
+    container_name: filebeat
+    labels:
+      - co.elastic.logs/enabled=false # Disable filebeat self log-scrubbing to prevent log looping
+    volumes:
+      - ./filebeat.yaml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - sidecar:/var/lib/graylog-sidecar/generated:rw
+    command:
+      - --strict.perms=false
+
+networks:
+  default:
+    external: true
+    name: observability
+
+volumes:
+  mongodb_data: {}
+  mongodb_config: {}
+  graylog-datanode: {}
+  graylog_data: {}
+  sidecar: {}
