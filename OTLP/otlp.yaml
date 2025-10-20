@@ -1,0 +1,70 @@
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+  filelog:
+    include: [/var/lib/docker/containers/*/*-json.log]
+    poll_interval: 10s
+    start_at: end
+    include_file_name: true
+    include_file_path: true 
+    operators:
+    - type: container
+      id: container
+      format: docker
+      add_metadata_from_filepath: false
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'hotrod'
+          static_configs:
+            - targets: ['hotrod:8080']
+          metrics_path: /metrics
+          scrape_interval: 10s
+
+  jaeger:
+    protocols:
+      thrift_compact:
+        endpoint: "0.0.0.0:6831"   # HotROD/Jaeger agent UDP (if used)
+      thrift_http:
+        endpoint: "0.0.0.0:14268"
+
+processors:
+  batch:
+  attributes:
+    actions:
+      - key: service.instance.id
+        action: insert
+        value: floral
+
+
+exporters:
+  otlphttp/openobserve:
+    endpoint: http://openobserve:5080/api/default
+    headers:
+      Authorization: Basic ${env:ZO_TOKEN}
+      stream-name: default
+
+
+service:
+  telemetry:
+    logs:
+      level: "warn"
+  pipelines:
+    traces:
+      receivers: [otlp, jaeger]
+      processors: [batch, attributes]
+      exporters: [otlphttp/openobserve]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [batch]
+      exporters: [otlphttp/openobserve]
+    logs:
+      receivers: [otlp,filelog]
+      processors: [batch]
+      exporters: [otlphttp/openobserve]

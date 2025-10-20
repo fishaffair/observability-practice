@@ -1,0 +1,80 @@
+
+services:
+  openobserve:
+    image: openobserve/openobserve:v0.15.1
+    container_name: openobserve
+    restart: unless-stopped
+    environment:
+      ZO_ROOT_USER_EMAIL: ${ZO_EMAIL}
+      ZO_ROOT_USER_PASSWORD: ${ZO_PASSWORD}
+      RUST_LOG: warning
+    ports:
+      - "127.0.0.1:5080:5080"   # UI / HTTP (OpenObserve default)
+      - "127.0.0.1:5081:5081"   # OTLP gRPC (OpenObserve default)
+    volumes:
+      - openobserve-data:/data
+    networks: [otlp]
+
+    
+  alloy:
+    hostname: floral
+    image: grafana/alloy:latest
+    container_name: alloy
+    restart: unless-stopped
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - ZO_TOKEN=${ZO_TOKEN}
+    ports:
+      - "127.0.0.1:12345:12345"    # Alloy debug UI
+      - "127.0.0.1:4317:4317"                 # OTLP gRPC receiver (optional)
+      - "127.0.0.1:4318:4318"                 # OTLP HTTP receiver (optional)
+    command:  run --server.http.listen-addr=0.0.0.0:12345 /etc/alloy/config.alloy
+    networks:
+       otlp:
+        aliases:
+        - collector
+
+  hotrod:
+    hostname: floral
+    image: jaegertracing/example-hotrod:latest
+    container_name: hotrod
+    restart: unless-stopped
+    labels:
+      prometheus-job: "hotrod"
+      prometheus-scrape-port: "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    command: ["all"]
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
+    networks: [otlp]
+
+  otlp-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    user: 0:0  # For docker logs scrape
+    environment:
+      - ZO_TOKEN=${ZO_TOKEN}
+    volumes:
+      - ./otlp.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP gRPC for apps
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+    networks: [otlp]
+    profiles:
+      - otlp-collector
+
+
+volumes:
+  openobserve-data: {}
+  grafanadata: {}
+
+networks:
+  otlp:
+    external: true
+    name: otlp

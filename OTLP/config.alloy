@@ -1,0 +1,198 @@
+
+livedebugging {
+  enabled = true
+}
+
+// --- Receivers ----
+otelcol.receiver.otlp "otlp" {
+  grpc { endpoint = "0.0.0.0:4317" }
+  http { endpoint = "0.0.0.0:4318" }
+  output {
+    traces = [otelcol.processor.tail_sampling.default.input]
+    metrics = [otelcol.processor.batch.default.input]
+    logs = [otelcol.processor.batch.default.input]
+  }
+}
+
+
+otelcol.processor.tail_sampling "default" {
+  decision_wait = "10s"
+  num_traces = 100
+  expected_new_traces_per_sec = 10
+  policy {
+    name = "url-filter-policy"
+    type = "string_attribute"
+    string_attribute {
+      key             = "url.path"
+      values          = ["/metrics"]
+      invert_match    = true
+    }
+  }
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+discovery.docker "docker" {
+  host = "unix:///var/run/docker.sock"
+}
+
+prometheus.exporter.cadvisor "cadvisor" {
+  docker_only = true
+}
+
+discovery.relabel "docker_containers" {
+	targets = discovery.docker.docker.targets
+	rule {
+		source_labels = ["__meta_docker_container_label_prometheus_job"]
+		regex         = ".+"
+		action        = "keep"
+	}
+
+	rule {
+		regex  = "__meta_docker_container_label_prometheus_(.+)"
+		action = "labelmap"
+	}
+
+	rule {
+		source_labels = ["__address__", "__meta_docker_container_label_prometheus_scrape_port"]
+		regex         = "(.+):\\d+;(.+)"
+		target_label  = "__address__"
+		replacement   = "$1:$2"
+	}
+
+	// rule {
+	// 	source_labels = ["__meta_docker_container_name"]
+	// 	regex         = "/(.+)"
+	// 	target_label  = "instance"
+	// }
+}
+
+prometheus.scrape "docker_containers" {
+	targets = array.concat(discovery.relabel.docker_containers.output, prometheus.exporter.cadvisor.cadvisor.targets,)
+	forward_to      = [otelcol.receiver.prometheus.otelmetrics.receiver]
+	scrape_interval = "5s"
+	scrape_timeout  = "5s"
+}
+
+discovery.relabel "logs_integrations_docker" {
+      targets = []
+      rule {
+          source_labels = ["__meta_docker_container_name"]
+          regex = "/(.*)"
+          target_label = "container_name"
+      }
+     rule {
+        target_label = "instance"
+        replacement  = constants.hostname
+    }
+}
+
+
+loki.source.docker "default" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.docker.targets
+  relabel_rules = discovery.relabel.logs_integrations_docker.rules
+  forward_to = [loki.process.docker_logs.receiver]
+}
+
+loki.process "docker_logs" {
+  stage.docker {}
+  stage.regex {
+    expression = `^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s+(?P<level>[A-Z]+)\s+(?P<caller>[^\s]+)\s+(?P<msg>[^{]+)\s*(?P<body>\{.*\})?$`
+  }
+  stage.drop {
+    expression  = `(?i)\binfo\b`
+    source = "level"
+}
+  stage.timestamp {
+    source = "ts"
+    format = "RFC3339"
+  }
+
+  stage.json {
+    source = "body"
+    expressions = {
+      service  = "service",
+      component = "component",
+      trace_id = "trace_id",
+      span_id  = "span_id",
+      method   = "method",
+      url      = "url",
+      pickup   = "pickup",
+      dropoff  = "dropoff",
+      driver   = "driver",
+      eta      = "eta",
+    }
+  }
+
+  stage.structured_metadata {
+    values = {
+      service  = "service",
+      component = "component",
+      trace_id = "trace_id",
+      span_id  = "span_id",
+      method   = "method",
+      url      = "url",
+      pickup   = "pickup",
+      dropoff  = "dropoff",
+      driver   = "driver",
+      eta      = "eta",
+    }
+}
+
+  stage.template {
+    source   = "new_json"
+    template = "{\"level\":\"{{ .level }}\",\"service\":\"{{ .service }}\",\"msg\":\"{{ ToLower .msg }}\",\"trace_id\":\"{{ .trace_id }}\",\"span_id\":\"{{ .span_id }}\"}"
+  }
+
+  stage.output {
+    source = "new_json"
+  }
+
+  forward_to = [otelcol.receiver.loki.default.receiver] 
+}
+
+otelcol.receiver.prometheus "otelmetrics" {
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.receiver.loki "default" {
+  output {
+    logs = [otelcol.processor.batch.default.input]
+  }
+}
+
+// --- Processors (batch) ----------------------------------------------------
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.openobserve.input]
+    metrics = [otelcol.exporter.otlp.openobserve.input]
+    logs = [otelcol.exporter.otlp.openobserve.input]
+  }
+}
+
+otelcol.exporter.otlp "openobserve" {
+  client {
+    endpoint = "openobserve:5081"
+    auth     = otelcol.auth.headers.creds.handler
+    tls { insecure = true }
+  }
+}
+
+otelcol.auth.headers "creds" {
+  header {
+    key          = "Authorization"
+    value = "Basic " + sys.env("ZO_TOKEN")
+  }
+  header {
+    key   = "organization"
+    value = "default"
+  }
+  header {
+    key   = "stream-name"
+    value = "default"
+  }
+}
