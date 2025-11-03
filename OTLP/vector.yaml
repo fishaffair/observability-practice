@@ -1,0 +1,63 @@
+data_dir: /vector-data-dir
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+  playground: true
+  graphql: true
+sources:
+  internal_metrics:
+    type: internal_metrics
+  vector:
+    address: 0.0.0.0:6000
+    type: vector
+    version: "2"
+  otel:
+    type: opentelemetry
+    grpc:
+      address: 0.0.0.0:4317
+    http:
+      address: 0.0.0.0:4318
+    use_otlp_decoding: true
+
+transforms:
+  otel_tenant:
+    type: remap
+    inputs:
+      - otel.traces
+    source: |
+      for_each(array!(get!(., ["resourceSpans"]))) -> |rs_index, rs| {
+        attrs = get!(rs, ["resource","attributes"])
+        for_each(array!(attrs)) -> |attr_index, attr| {
+          if attr.key == "tenant.name" {
+            .tenant = attr.value.stringValue
+          }
+        }
+      }
+
+  only_with_tenant:
+    type: filter
+    inputs: [otel_tenant]
+    condition: 'exists(.tenant)'
+
+sinks:
+  prom_exporter:
+    type: prometheus_exporter
+    inputs: [internal_metrics]
+    address: 0.0.0.0:9090
+  stdout:
+    type: console
+    inputs: [only_with_tenant]
+    encoding:
+      codec: json
+      pretty: true
+  tempo:
+    inputs:
+      - only_with_tenant
+    type: opentelemetry
+    protocol:
+      type: http
+      uri: "http://tempo:4444/v1/traces"
+      encoding:
+        codec: otlp
+      headers:
+          X-Scope-OrgID: "{{ tenant }}"

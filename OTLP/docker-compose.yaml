@@ -14,8 +14,8 @@ services:
     volumes:
       - openobserve-data:/data
     networks: [otlp]
-
-    
+    profiles:
+      - openobserve
   alloy:
     hostname: floral
     image: grafana/alloy:latest
@@ -35,6 +35,8 @@ services:
        otlp:
         aliases:
         - collector
+    profiles:
+      - alloy
 
   hotrod:
     hostname: floral
@@ -65,14 +67,107 @@ services:
     ports:
       - "127.0.0.1:4317:4317"   # OTLP gRPC for apps
       - "127.0.0.1:4318:4318"   # OTLP HTTP
-    networks: [otlp]
+    networks:
+       otlp:
+        aliases:
+        - collector
     profiles:
       - otlp-collector
 
+  vector:
+    image: timberio/vector:nightly-2025-11-01-alpine
+    container_name: vector
+    environment:
+      - ZO_PASSWORD=${ZO_PASSWORD}
+      - VECTOR_INTERNAL_LOG_RATE_LIMIT=1 # For debug
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+    ports:
+      - "127.0.0.1:8686:8686"
+      - "127.0.0.1:4318:4318" # OTLP gRPC
+      - "127.0.0.1:4317:4317" # OTLP HTTP
+    depends_on:
+      - hotrod
+    networks:
+       otlp:
+        aliases:
+        - collector
+    profiles:
+      - vector
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks: [otlp]
+    entrypoint:
+       - sh
+       - -euc
+       - |
+         mkdir -p /etc/grafana/provisioning/datasources
+         cat <<EOF > /etc/grafana/provisioning/datasources/tempo-tenant-1.yaml
+         apiVersion: 1
+         datasources:
+         - name: tempo-floral
+           type: tempo
+           access: proxy
+           orgId: 1
+           url: 'http://tempo:3200'
+           basicAuth: false
+           version: 1
+           editable: true 
+           isDefault: true
+           jsonData:
+             httpHeaderName1: "X-Scope-OrgID"
+           secureJsonData:
+             httpHeaderValue1: "floral"
+         EOF
+         cat <<EOF > /etc/grafana/provisioning/datasources/tempo-tenant-2.yaml
+         apiVersion: 1
+         datasources:
+         - name: tempo-entity
+           type: tempo
+           access: proxy
+           orgId: 1
+           url: 'http://tempo:3200'
+           basicAuth: false
+           version: 1
+           jsonData:
+             httpHeaderName1: "X-Scope-OrgID"
+           secureJsonData:
+             httpHeaderValue1: "entity"
+         EOF
+         /run.sh
+    depends_on:
+      - tempo
+    profiles:
+      - tempo
+
+  tempo:
+    container_name: tempo
+    image: grafana/tempo:latest
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+      - tempodata:/var/tempo
+    ports:
+      - "127.0.0.1:3200:3200" # tempo ui
+      - "127.0.0.1:3333:3333" # otlp grpc remapped port
+      - "127.0.0.1:4444:4444" # otlp http remapped port
+    networks: [otlp]
+    profiles:
+      - tempo
 
 volumes:
   openobserve-data: {}
   grafanadata: {}
+  tempodata: {}
 
 networks:
   otlp:
