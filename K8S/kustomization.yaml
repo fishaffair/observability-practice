@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+helmCharts:
+- name: vector
+  repo: https://helm.vector.dev
+  releaseName: vector-agent
+  namespace: observability
+  valuesFile: vector-agent.yaml
+
+- name: vector
+  repo: https://helm.vector.dev
+  releaseName: vector-aggregator
+  namespace: observability
+  valuesFile: vector-aggregator.yaml
+
+- name: victoria-metrics-k8s-stack
+  repo: https://victoriametrics.github.io/helm-charts
+  releaseName: observability
+  namespace: observability
+  valuesFile: victoria-metrics-stack.yaml
+
+resources:
+  - namespaces.yaml
+  - loki.yaml
+  - tempo.yaml
+  - mimir.yaml
+  - tenant-workload.yaml
+  - vmservicescrape.yaml

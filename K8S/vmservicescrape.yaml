@@ -1,0 +1,79 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: hotrod-service-scrape
+  namespace: tenant-a
+  labels:
+    vm-target: hotrod
+spec:
+  selector:
+    matchLabels:
+      app: hotrod
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scheme: http
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAgent
+metadata:
+  name: vmagent-tenant-a
+  namespace: tenant-a
+spec:
+  externalLabels:
+    multitenant_monitoring_label: tenant_a
+  scrapeInterval: 30s
+  serviceScrapeSelector:
+    matchLabels:
+      vm-target: hotrod
+  remoteWrite:
+    - url: http://mimir.observability:9009/api/v1/push
+      headers:
+        - "X-Scope-OrgID: tenant-a"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "100Mi"
+    limits:
+      cpu: "500m"
+      memory: "100Mi"
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: hotrod-service-scrape
+  namespace: tenant-b
+  labels:
+    vm-target: hotrod
+spec:
+  selector:
+    matchLabels:
+      app: hotrod
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scheme: http
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAgent
+metadata:
+  name: vmagent-tenant-b
+  namespace: tenant-b
+spec:
+  scrapeInterval: 30s
+  serviceScrapeSelector:
+    matchLabels:
+      vm-target: hotrod
+  remoteWrite:
+    - url: http://mimir.observability:9009/api/v1/push
+      headers:
+        - "X-Scope-OrgID: tenant-b"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "100Mi"
+    limits:
+      cpu: "500m"
+      memory: "100Mi"

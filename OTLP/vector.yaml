@@ -25,13 +25,12 @@ transforms:
     inputs:
       - otel.traces
     source: |
-      for_each(array!(get!(., ["resourceSpans"]))) -> |rs_index, rs| {
-        attrs = get!(rs, ["resource","attributes"])
-        for_each(array!(attrs)) -> |attr_index, attr| {
-          if attr.key == "tenant.name" {
-            .tenant = attr.value.stringValue
-          }
+      for_each(array!(.resourceSpans)) -> |_rs, rs| {
+        attrs = array!(get!(rs, ["resource", "attributes"]))
+        matches = filter(attrs) -> |atr, a| {
+          a.key == "tenant.name"
         }
+      .tenant = get!(matches, [0, "value", "stringValue"])
       }
 
   only_with_tenant:

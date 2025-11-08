@@ -1,0 +1,787 @@
+global:
+  clusterLabel: observability
+  license:
+    key: ""
+    keyRef: {}
+  cluster:
+    dnsDomain: cluster.local.
+nameOverride: ""
+fullnameOverride: ""
+tenant: "0"
+argocdReleaseOverride: ""
+victoria-metrics-operator:
+  enabled: true
+  crds:
+    plain: false
+    cleanup:
+      enabled: false
+      image:
+        repository: rancher/kubectl
+        pullPolicy: IfNotPresent
+  serviceMonitor:
+    enabled: true
+  operator:
+    disable_prometheus_converter: false
+defaultDashboards:
+  enabled: true
+  defaultTimezone: browser
+  labels: {}
+  annotations: {}
+  grafanaOperator:
+    enabled: false
+    spec:
+      instanceSelector:
+        matchLabels:
+          dashboards: grafana
+      allowCrossNamespaceImport: false
+  dashboards:
+    victoriametrics-vmalert:
+      enabled: true
+    victoriametrics-operator:
+      enabled: true
+    node-exporter-full:
+      enabled: true
+defaultRules:
+  additionalGroupByLabels: []
+  create: false
+  group:
+    spec:
+      params: {}
+  rule:
+    spec:
+      labels: {}
+      annotations: {}
+  alerting:
+    spec:
+      labels: {}
+      annotations: {}
+  recording:
+    spec:
+      labels: {}
+      annotations: {}
+  rules: {}
+  groups:
+    etcd:
+      create: true
+      rules: {}
+    general:
+      create: true
+      rules: {}
+    k8sContainerCpuLimits:
+      create: true
+      rules: {}
+    k8sContainerCpuRequests:
+      create: true
+      rules: {}
+    k8sContainerCpuUsageSecondsTotal:
+      create: true
+      rules: {}
+    k8sContainerMemoryLimits:
+      create: true
+      rules: {}
+    k8sContainerMemoryRequests:
+      create: true
+      rules: {}
+    k8sContainerMemoryRss:
+      create: true
+      rules: {}
+    k8sContainerMemoryCache:
+      create: true
+      rules: {}
+    k8sContainerMemoryWorkingSetBytes:
+      create: true
+      rules: {}
+    k8sContainerMemorySwap:
+      create: true
+      rules: {}
+    k8sPodOwner:
+      create: true
+      rules: {}
+    k8sContainerResource:
+      create: true
+      rules: {}
+    kubeApiserver:
+      create: true
+      rules: {}
+    kubeApiserverAvailability:
+      create: true
+      rules: {}
+    kubeApiserverBurnrate:
+      create: true
+      rules: {}
+    kubeApiserverHistogram:
+      create: true
+      rules: {}
+    kubeApiserverSlos:
+      create: true
+      rules: {}
+    kubelet:
+      create: true
+      rules: {}
+    kubePrometheusGeneral:
+      create: true
+      rules: {}
+    kubePrometheusNodeRecording:
+      create: true
+      rules: {}
+    kubernetesApps:
+      create: true
+      rules: {}
+      targetNamespace: ".*"
+    kubernetesResources:
+      create: true
+      rules: {}
+    kubernetesStorage:
+      create: true
+      rules: {}
+      targetNamespace: ".*"
+    kubernetesSystem:
+      create: true
+      rules: {}
+    kubernetesSystemKubelet:
+      create: true
+      rules: {}
+    kubernetesSystemApiserver:
+      create: true
+      rules: {}
+    kubernetesSystemControllerManager:
+      create: true
+      rules: {}
+    kubeScheduler:
+      create: true
+      rules: {}
+    kubernetesSystemScheduler:
+      create: true
+      rules: {}
+    kubeStateMetrics:
+      create: true
+      rules: {}
+    nodeNetwork:
+      create: false
+      rules: {}
+    node:
+      create: true
+      rules: {}
+    vmagent:
+      create: true
+      rules: {}
+    vmsingle:
+      create: true
+      rules: {}
+    vmcluster:
+      create: true
+      rules: {}
+    vmHealth:
+      create: true
+      rules: {}
+    vmoperator:
+      create: true
+      rules: {}
+    alertmanager:
+      create: false
+      rules: {}
+  runbookUrl: https://runbooks.prometheus-operator.dev/runbooks
+  labels: {}
+  annotations: {}
+additionalVictoriaMetricsMap:
+external:
+  grafana:
+    host: ""
+    datasource: VictoriaMetrics
+  vm:
+    read:
+      url: ""
+    write:
+      url: ""
+vmsingle:
+  labels: {}
+  annotations: {}
+  enabled: false
+  spec:
+    port: "8428"
+    retentionPeriod: "1d"
+    replicaCount: 1
+    extraArgs: {}
+    storage:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi
+  ingress:
+    enabled: false
+    annotations:
+      {}
+    labels: {}
+    path: ""
+    pathType: Prefix
+    ingressClassName: ""
+    hosts: []
+    extraPaths: []
+    tls: []
+  route:
+    enabled: false
+    annotations: {}
+    labels: {}
+    parentRefs: []
+    hostnames: []
+    extraRules: []
+    port: '{{ .Values.vmsingle.spec.port }}'
+    filters: []
+    matches:
+      - path:
+          type: PathPrefix
+          value: '{{ dig "spec" "extraArgs" "http.pathPrefix" "/" .Values.vmsingle }}'
+vmcluster:
+  enabled: false
+  labels: {}
+  annotations: {}
+  spec:
+    retentionPeriod: "1"
+    replicationFactor: 2
+    vmstorage:
+      replicaCount: 2
+      storageDataPath: /vm-data
+      storage:
+        volumeClaimTemplate:
+          spec:
+            resources:
+              requests:
+                storage: 10Gi
+      resources:
+        {}
+    vmselect:
+      enabled: true
+      port: "8481"
+      replicaCount: 2
+      cacheMountPath: /select-cache
+      extraArgs: {}
+      storage:
+        volumeClaimTemplate:
+          spec:
+            resources:
+              requests:
+                storage: 2Gi
+      resources:
+        {}
+    vminsert:
+      enabled: true
+      port: "8480"
+      replicaCount: 2
+      extraArgs: {}
+      resources:
+        {}
+  ingress:
+    storage:
+      enabled: false
+      annotations: {}
+      labels: {}
+      ingressClassName: ""
+      pathType: Prefix
+      path: ""
+      hosts: []
+      extraPaths: []
+      tls: []
+    select:
+      enabled: false
+      annotations: {}
+      labels: {}
+      ingressClassName: ""
+      pathType: Prefix
+      path: '{{ dig "extraArgs" "http.pathPrefix" "/" .Values.vmcluster.spec.vmselect }}'
+      hosts: []
+      extraPaths: []
+      tls: []
+    insert:
+      enabled: false
+      annotations:
+        {}
+      labels: {}
+      ingressClassName: ""
+      pathType: Prefix
+      path: '{{ dig "extraArgs" "http.pathPrefix" "/" .Values.vmcluster.spec.vminsert }}'
+      hosts: []
+      extraPaths: []
+      tls: []
+  route:
+    storage:
+      enabled: false
+      annotations: {}
+      labels: {}
+      parentRefs: []
+      hostnames: []
+      extraRules: []
+      port: '{{ .Values.vmcluster.spec.vmstorage.port }}'
+      filters: []
+      matches:
+        - path:
+            type: PathPrefix
+            value: '{{ dig "extraArgs" "http.pathPrefix" "/" .Values.vmcluster.spec.vmstorage }}'
+    select:
+      enabled: false
+      annotations: {}
+      labels: {}
+      parentRefs: []
+      hostnames: []
+      extraRules: []
+      port: '{{ .Values.vmcluster.spec.vmselect.port }}'
+      filters: []
+      matches:
+        - path:
+            type: PathPrefix
+            value: '{{ dig "extraArgs" "http.pathPrefix" "/" .Values.vmcluster.spec.vmselect }}'
+    insert:
+      enabled: false
+      annotations: {}
+      labels: {}
+      parentRefs: []
+      hostnames: []
+      extraRules: []
+      port: '{{ .Values.vmcluster.spec.vminsert.port }}'
+      filters: []
+      matches:
+        - path:
+            type: PathPrefix
+            value: '{{ dig "extraArgs" "http.pathPrefix" "/" .Values.vmcluster.spec.vminsert }}'
+alertmanager:
+  enabled: false
+  labels: {}
+  annotations: {}
+  spec:
+    replicaCount: 1
+    port: "9093"
+    selectAllByDefault: true
+    image:
+      tag: v0.28.1
+    externalURL: ""
+    routePrefix: /
+    configSecret: ""
+  useManagedConfig: false
+  config:
+    route:
+      receiver: "blackhole"
+    #
+    receivers:
+      - name: blackhole
+    #
+  monzoTemplate:
+    enabled: true
+  templateFiles:
+    {}
+  ingress:
+    enabled: false
+    annotations:
+      {}
+    labels: {}
+    path: '{{ .Values.alertmanager.spec.routePrefix | default "/" }}'
+    pathType: Prefix
+    hosts:
+      - alertmanager.domain.com
+    extraPaths: []
+    tls: []
+  route:
+    enabled: false
+    annotations: {}
+    labels: {}
+    parentRefs: []
+    hostnames: []
+    extraRules: []
+    port: '{{ .Values.alertmanager.spec.port }}'
+    filters: []
+    matches:
+      - path:
+          type: PathPrefix
+          value: '{{ .Values.alertmanager.spec.routePrefix | default "/" }}'
+vmalert:
+  annotations: {}
+  labels: {}
+  enabled: false
+  remoteWriteVMAgent: false
+  spec:
+    port: "8080"
+    selectAllByDefault: true
+    evaluationInterval: 20s
+    extraArgs:
+      http.pathPrefix: "/"
+    externalLabels: {}
+  templateFiles:
+    {}
+  additionalNotifierConfigs: {}
+  ingress:
+    enabled: false
+    annotations:
+      {}
+    labels: {}
+    path: ""
+    pathType: Prefix
+    hosts:
+      - vmalert.domain.com
+    extraPaths: []
+    tls: []
+  route:
+    enabled: false
+    annotations: {}
+    labels: {}
+    parentRefs: []
+    hostnames: []
+    extraRules: []
+    port: '{{ .Values.vmalert.spec.port }}'
+    filters: []
+    matches:
+      - path:
+          type: PathPrefix
+          value: '{{ dig "spec" "extraArgs" "http.pathPrefix" "/" .Values.vmalert }}'
+vmauth:
+  enabled: false
+  labels: {}
+  annotations: {}
+  spec:
+    port: "8427"
+    unauthorizedUserAccessSpec:
+      disabled: false
+      discover_backend_ips: true
+      url_map:
+        - src_paths:
+            - '{{ .vm.read.path }}/.*'
+          url_prefix:
+            - '{{ urlJoin (omit .vm.read "path") }}/'
+        - src_paths:
+            - '{{ .vm.write.path }}/.*'
+          url_prefix:
+            - '{{ urlJoin (omit .vm.write "path") }}/'
+vmagent:
+  enabled: true
+  labels: {}
+  annotations: {}
+  additionalRemoteWrites: []
+  spec:
+    port: "8429"
+    selectAllByDefault: true
+    scrapeInterval: 20s
+    externalLabels: {}
+    extraArgs:
+      promscrape.streamParse: "true"
+      promscrape.dropOriginalLabels: "true"
+    remoteWrite:
+      - url: http://mimir.observability:9009/api/v1/push
+        headers:
+          - "X-Scope-OrgID: infra"
+  ingress:
+    enabled: false
+    annotations:
+      {}
+    labels: {}
+    path: ""
+    pathType: Prefix
+    hosts:
+      - vmagent.domain.com
+    extraPaths: []
+    tls: []
+  route:
+    enabled: false
+    annotations: {}
+    labels: {}
+    parentRefs: []
+    hostnames: []
+    extraRules: []
+    port: '{{ .Values.vmagent.spec.port }}'
+    filters: []
+    matches:
+      - path:
+          type: PathPrefix
+          value: '{{ dig "spec" "extraArgs" "http.pathPrefix" "/" .Values.vmagent }}'
+defaultDatasources:
+  grafanaOperator:
+    enabled: false
+    annotations: {}
+    spec:
+      instanceSelector:
+        matchLabels:
+          dashboards: grafana
+      allowCrossNamespaceImport: false
+  victoriametrics:
+    perReplica: false
+    datasources: []
+  alertmanager:
+    perReplica: false
+    datasources:
+      - name: Alertmanager
+        access: proxy
+        jsonData:
+          implementation: prometheus
+  extra: []
+grafana:
+  enabled: true
+  sidecar:
+    datasources:
+      enabled: true
+      initDatasources: true
+      label: grafana_datasource
+    dashboards:
+      provider:
+        name: default
+        orgid: 1
+      folder: /var/lib/grafana/dashboards
+      defaultFolderName: default
+      enabled: true
+      multicluster: false
+  service:
+    enabled: true
+    type: NodePort
+    nodePort: 30000
+  forceDeployDatasource: false
+  adminUser: admin
+  adminPassword: admin
+  #
+  ingress:
+    enabled: false
+    annotations:
+      {}
+    labels: {}
+    path: /
+    pathType: Prefix
+    hosts:
+      - grafana.domain.com
+    extraPaths: []
+    tls: []
+  vmScrape:
+    enabled: true
+    spec:
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: '{{ include "grafana.name" .Subcharts.grafana }}'
+      endpoints:
+        - port: '{{ .Values.grafana.service.portName }}'
+defaultScrapeService:
+  namespace: kube-system
+prometheus-node-exporter:
+  enabled: true
+  service:
+    #
+    labels:
+      jobLabel: node-exporter
+  extraArgs:
+    - --collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+    - --collector.filesystem.ignored-fs-types=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|erofs|sysfs|tracefs)$
+  vmScrape:
+    enabled: true
+    spec:
+      jobLabel: jobLabel
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: '{{ include "prometheus-node-exporter.name" (index .Subcharts "prometheus-node-exporter") }}'
+      endpoints:
+        - port: metrics
+          metricRelabelConfigs:
+            - action: drop
+              source_labels: [mountpoint]
+              regex: "/var/lib/kubelet/pods.+"
+kube-state-metrics:
+  enabled: true
+  metricLabelsAllowlist:
+    - namespaces=[tenant.name]
+  vmScrape:
+    enabled: true
+    spec:
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: '{{ include "kube-state-metrics.name" (index .Subcharts "kube-state-metrics") }}'
+          app.kubernetes.io/instance: '{{ include "vm.release" . }}'
+      endpoints:
+        - port: http
+          honorLabels: true
+          metricRelabelConfigs:
+            - action: labeldrop
+              regex: (uid|container_id|image_id)
+      jobLabel: app.kubernetes.io/name
+kubelet:
+  enabled: true
+  vmScrapes:
+    cadvisor:
+      enabled: true
+      spec:
+        path: /metrics/cadvisor
+    probes:
+      enabled: true
+      spec:
+        path: /metrics/probes
+    resources:
+      enabled: true
+      spec:
+        path: /metrics/resource
+    kubelet:
+      spec: {}
+  vmScrape:
+    kind: VMNodeScrape
+    spec:
+      scheme: "https"
+      honorLabels: true
+      interval: "30s"
+      scrapeTimeout: "5s"
+      tlsConfig:
+        insecureSkipVerify: true
+        caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      metricRelabelConfigs:
+        - action: labeldrop
+          regex: (uid)
+        - action: labeldrop
+          regex: (id|name)
+        - action: drop
+          source_labels: [__name__]
+          regex: (rest_client_request_duration_seconds_bucket|rest_client_request_duration_seconds_sum|rest_client_request_duration_seconds_count)
+      relabelConfigs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+        - sourceLabels: [__metrics_path__]
+          targetLabel: metrics_path
+        - targetLabel: job
+          replacement: kubelet
+      honorTimestamps: false
+kubeApiServer:
+  enabled: true
+  vmScrape:
+    spec:
+      endpoints:
+        - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+          port: https
+          scheme: https
+          tlsConfig:
+            caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            serverName: kubernetes
+      jobLabel: component
+      namespaceSelector:
+        matchNames:
+          - default
+      selector:
+        matchLabels:
+          component: apiserver
+          provider: kubernetes
+kubeControllerManager:
+  enabled: false
+  endpoints: []
+  service:
+    enabled: true
+    port: 10257
+    targetPort: 10257
+    labels: {}
+    selector:
+      component: kube-controller-manager
+  vmScrape:
+    spec:
+      jobLabel: jobLabel
+      namespaceSelector:
+        matchNames: []
+      endpoints:
+        - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+          port: http-metrics
+          scheme: https
+          tlsConfig:
+            caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            serverName: kubernetes
+kubeDns:
+  enabled: false
+  service:
+    enabled: false
+    labels: {}
+    ports:
+      dnsmasq:
+        port: 10054
+        targetPort: 10054
+      skydns:
+        port: 10055
+        targetPort: 10055
+    selector:
+      k8s-app: kube-dns
+  vmScrape:
+    spec:
+      jobLabel: jobLabel
+      namespaceSelector:
+        matchNames: []
+      endpoints:
+        - port: http-metrics-dnsmasq
+          bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+        - port: http-metrics-skydns
+          bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+coreDns:
+  enabled: true
+  service:
+    enabled: true
+    port: 9153
+    targetPort: 9153
+    labels: {}
+    selector:
+      k8s-app: kube-dns
+  vmScrape:
+    spec:
+      jobLabel: jobLabel
+      namespaceSelector:
+        matchNames: []
+      endpoints:
+        - port: http-metrics
+          bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+kubeEtcd:
+  enabled: false
+  endpoints: []
+  service:
+    enabled: true
+    port: 2379
+    targetPort: 2379
+    labels: {}
+    selector:
+      component: etcd
+  vmScrape:
+    spec:
+      jobLabel: jobLabel
+      namespaceSelector:
+        matchNames: []
+      endpoints:
+        - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+          port: http-metrics
+          scheme: https
+          tlsConfig:
+            caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            insecureSkipVerify: true
+kubeScheduler:
+  enabled: false
+  endpoints: []
+  service:
+    enabled: true
+    port: 10259
+    targetPort: 10259
+    labels: {}
+    selector:
+      component: kube-scheduler
+  vmScrape:
+    spec:
+      jobLabel: jobLabel
+      namespaceSelector:
+        matchNames: []
+      endpoints:
+        - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+          port: http-metrics
+          scheme: https
+          tlsConfig:
+            caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+kubeProxy:
+  enabled: false
+  endpoints: []
+  service:
+    enabled: true
+    port: 10249
+    targetPort: 10249
+    labels: {}
+    selector:
+      k8s-app: kube-proxy
+  vmScrape:
+    spec:
+      jobLabel: jobLabel
+      namespaceSelector:
+        matchNames: []
+      endpoints:
+        - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+          port: http-metrics
+          scheme: https
+          tlsConfig:
+            caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+extraObjects: []

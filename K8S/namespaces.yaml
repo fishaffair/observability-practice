@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a
+  labels:
+    tenant.name: tenant-a
+    log.scrape: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-b
+  labels:
+    tenant.name: tenant-b
+    log.scrape: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: subtenant-b
+  labels:
+    tenant.name: tenant-b
+    log.scrape: "true"
+
