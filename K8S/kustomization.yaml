@@ -27,3 +27,4 @@ resources:
   - mimir.yaml
   - tenant-workload.yaml
   - vmservicescrape.yaml
+  - vector-dashboard.yaml

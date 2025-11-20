@@ -36,7 +36,7 @@ defaultDashboards:
       allowCrossNamespaceImport: false
   dashboards:
     victoriametrics-vmalert:
-      enabled: true
+      enabled: false
     victoriametrics-operator:
       enabled: true
     node-exporter-full:
@@ -514,7 +514,7 @@ grafana:
   enabled: true
   sidecar:
     datasources:
-      enabled: true
+      enabled: false
       initDatasources: true
       label: grafana_datasource
     dashboards:
@@ -532,18 +532,14 @@ grafana:
   forceDeployDatasource: false
   adminUser: admin
   adminPassword: admin
-  #
-  ingress:
+  persistence:
+    type: pvc
     enabled: false
-    annotations:
-      {}
-    labels: {}
-    path: /
-    pathType: Prefix
-    hosts:
-      - grafana.domain.com
-    extraPaths: []
-    tls: []
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+  initChownData:
+    enabled: false
   vmScrape:
     enabled: true
     spec:
