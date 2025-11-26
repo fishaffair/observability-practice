@@ -29,10 +29,27 @@ customConfig:
         .tenant = get!(matches, [0, "value", "stringValue"])
         }
 
-    only_with_tenant:
+    drop_useless_traces:
       type: filter
       inputs: [otel_tenant]
-      condition: 'exists(.tenant)'
+      condition: |
+        blocked = false
+        for_each(array!(.resourceSpans)) -> |_rs_i, rs| {
+          for_each(array!(get!(rs, ["scopeSpans"])) ) -> |_ss_i, ss| {
+            for_each(array!(get!(ss, ["spans"])) ) -> |_s_i, s| {
+              attrs = array!(get!(s, ["attributes"]))
+              matches = filter(attrs) -> |_a_i, a| {
+                a.key == "url.path" &&
+                (get!(a, ["value", "stringValue"]) == "/metrics" ||
+                get!(a, ["value", "stringValue"]) == "/health")
+              }
+              if length(matches) > 0 {
+                blocked = true
+              }
+            }
+          }
+        }
+        !blocked
 
   sinks:
     prom_exporter:
@@ -41,13 +58,13 @@ customConfig:
       address: 0.0.0.0:9090
     stdout:
       type: console
-      inputs: [only_with_tenant]
+      inputs: [drop_useless_traces]
       encoding:
         codec: json
         pretty: true
     tempo:
       inputs:
-        - only_with_tenant
+        - drop_useless_traces
       type: opentelemetry
       protocol:
         type: http
