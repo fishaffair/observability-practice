@@ -83,6 +83,8 @@ kind: VMServiceScrape
 metadata:
   name: vector-metrics
   namespace: observability
+  labels:
+    app.kubernetes.io/instance: observability
 spec:
   endpoints:
     - port: prom-exporter

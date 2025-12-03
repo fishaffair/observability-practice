@@ -5,16 +5,16 @@ customConfig:
     address: 127.0.0.1:8686
     playground: false
   sources:
-    kubernetes_logs:
+    logs:
       type: kubernetes_logs
       extra_namespace_label_selector: "log.scrape=true"
     internal_metrics:
       type: internal_metrics
   transforms:
-    kubernetes_parser:
+    parser:
       type: remap
       inputs:
-          - kubernetes_logs
+          - logs
       source: |
         del(.file)
         del(.kubernetes.container_id)
@@ -41,16 +41,34 @@ customConfig:
         .kubernetes = object!(.kubernetes)
         . = merge(., .kubernetes)
         del(.kubernetes)
+    filter:
+      type: filter
+      inputs:
+        - parser
+      condition: '!(contains(string!(.message), "info", false) || contains(string!(.message), "debug", false))'
+    dedupe:
+      type: dedupe
+      inputs:
+        - filter
+    throttle:
+      type: throttle
+      inputs:
+        - dedupe
+      key_field: |-
+            {{ print "{{ tenant_name }}" }}
+      threshold: 100
+      window_secs: 10
+
   sinks:
     stdout:
       type: console
-      inputs: [kubernetes_parser]
+      inputs: [throttle]
       encoding:
         codec: json
         pretty: true
     loki:
       inputs:
-        - kubernetes_parser
+        - throttle
       type: loki
       compression: snappy
       encoding:
@@ -102,7 +120,7 @@ image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
   pullSecrets: []
-  tag: ""
+  tag: "nightly-alpine"
   sha: ""
   base: ""
 
@@ -212,7 +230,7 @@ service:
   trafficDistribution: ""
 
 serviceHeadless:
-  enabled: true
+  enabled: false
 
 ingress:
   enabled: false

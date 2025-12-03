@@ -456,7 +456,13 @@ vmagent:
   additionalRemoteWrites: []
   spec:
     port: "8429"
-    selectAllByDefault: true
+    selectAllByDefault: false
+    serviceScrapeSelector: 
+      matchLabels:
+        app.kubernetes.io/instance: observability # only scrape vmservice with labels to avoid collision with tenant metrics
+    serviceScrapeNamespaceSelector: 
+      matchLabels:
+        metrics.scrape: "true" # only scrape vmservice at namespace with labels to avoid collision with tenant metrics
     scrapeInterval: 20s
     externalLabels: {}
     extraArgs:

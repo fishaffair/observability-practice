@@ -97,7 +97,7 @@ image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
   pullSecrets: []
-  tag: ""
+  tag: "nightly-alpine"
   sha: ""
   base: ""
 
@@ -236,7 +236,7 @@ service:
   trafficDistribution: ""
 
 serviceHeadless:
-  enabled: true
+  enabled: false
 
 ingress:
   enabled: false
