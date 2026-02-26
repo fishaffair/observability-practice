@@ -1,0 +1,25 @@
+api:
+  enabled: false
+
+data_dir: /var/lib/vector
+
+sources:
+  kafka_source:
+    type: kafka
+    bootstrap_servers: "kafka:9093"
+    group_id: "vector-readers"
+    topics: ["logs-topic"]
+    tls:
+     enabled: true
+     ca_file: /etc/pki/kafka/ca-cert.pem
+     crt_file: /etc/pki/kafka/broker-cert.pem
+     key_file: /etc/pki/kafka/broker-key.pem
+
+
+sinks:
+  log_console:
+    type: console
+    inputs: ["kafka_source"]
+    encoding:
+      codec: json
+

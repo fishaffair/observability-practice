@@ -1,0 +1,57 @@
+api:
+  enabled: false
+
+data_dir: /var/lib/vector
+
+sources:
+  docker_logs:
+    type: docker_logs
+    include_labels:
+      - vector.enabled=true
+
+transforms:
+  docker_parser:
+    type: remap
+    inputs: 
+      - docker_logs # Delete unused labels
+    source: |
+        del(.container_created_at)
+        del(.container_id)
+        del(.stream)
+        del(.source_type)
+        del(.label."com.docker.compose.image")
+        del(.label."com.docker.compose.oneoff")
+        del(.label."com.docker.compose.depends_on")
+        del(.label."com.docker.compose.version")
+        del(.label."com.docker.compose.container-number")
+        del(.label."com.docker.compose.config-hash")
+        del(.label."com.docker.compose.project.config_files")
+        del(.label."com.docker.compose.project.working_dir")
+        del(.label."com.docker.compose.replace")
+        err, err = parse_json(.message)
+        if err == null {
+          .message = parse_json!(string!(.message))
+        }
+
+sinks:
+  kafka:
+    type: kafka
+    inputs: ["docker_parser"]
+    bootstrap_servers: "kafka:9093"
+    topic: "logs-topic"
+    compression: snappy
+    encoding:
+      codec: json
+    headers_key: label
+    key_field: "container_name"
+    tls:
+     enabled: true
+     ca_file: /etc/pki/kafka/ca-cert.pem
+     crt_file: /etc/pki/kafka/broker-cert.pem
+     key_file: /etc/pki/kafka/broker-key.pem
+
+  log_console:
+    type: console
+    inputs: ["docker_parser"]
+    encoding:
+      codec: json

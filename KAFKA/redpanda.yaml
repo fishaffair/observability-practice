@@ -1,0 +1,16 @@
+kafka:
+  brokers:
+    - "kafka:9093"
+  tls:
+    enabled: true
+    caFilepath: "/etc/pki/kafka/ca-cert.pem"
+    certFilepath: "/etc/pki/kafka/broker-cert.pem"
+    keyFilepath: "/etc/pki/kafka/broker-key.pem"
+  startup:
+    maxRetries: 5
+    retryInterval: 5s
+    maxRetryInterval: 30s
+    backoffMultiplier: 2
+
+analytics:
+  enabled: false

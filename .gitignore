@@ -1,3 +1,4 @@
 **/dashboards/**/*.json
 *.env
 **/charts/**
+**/certs/**

@@ -1,0 +1,90 @@
+name: kafka
+services:
+
+  kafka:
+    container_name: kafka
+    image: confluentinc/cp-kafka
+    # image: apache/kafka
+    environment:
+      KAFKA_NODE_ID: "1"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9094"
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9094,EXTERNAL://:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://kafka:9093,INTERNAL://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SSL,CONTROLLER:SSL,EXTERNAL:SSL
+      KAFKA_SSL_KEYSTORE_TYPE: "PEM"
+      KAFKA_SSL_TRUSTSTORE_TYPE: "PEM"
+      KAFKA_SSL_KEYSTORE_LOCATION: "/etc/kafka/secrets/broker-keypair.pem"
+      KAFKA_SSL_TRUSTSTORE_LOCATION: "/etc/kafka/secrets/ca-cert.pem"
+      KAFKA_SSL_CLIENT_AUTH: "required"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: true
+      KAFKA_LOG4J_ROOTLOGGER: WARN
+      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+
+    ports:
+    - "127.0.0.1:9093:9093"
+    volumes:
+    - "./certs:/etc/kafka/secrets:ro"
+    - "kafka-data:/var/lib/kafka/data"
+    - "kafka-config:/mnt/shared/config"
+  vector-producer:
+    image: timberio/vector:nightly-alpine
+    container_name: vector-producer
+    volumes:
+      - ./vector-producer.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/etc/pki/kafka
+    depends_on:
+      - kafka
+  vector-consumer:
+    image: timberio/vector:nightly-alpine
+    container_name: vector-consumer
+    volumes:
+      - ./vector-consumer.yaml:/etc/vector/vector.yaml:ro
+      - ./certs:/etc/pki/kafka
+    depends_on:
+      - kafka
+
+  log-generator:
+    image: mingrammer/flog
+    container_name: flog
+    labels:
+      - vector.enabled=true
+    command:
+      - --format=json
+      - --loop
+      - --number=10
+      - --delay=5000ms
+    depends_on:
+      - vector-producer
+
+  redpanda:
+    user: 1000:1000
+    labels:
+      - vector.enabled=true
+    image: docker.redpanda.com/redpandadata/console:latest
+    container_name: redpanda
+    environment:
+      CONFIG_FILEPATH: /etc/redpanda.yaml
+    volumes:
+      - ./redpanda.yaml:/etc/redpanda.yaml
+      - ./certs:/etc/pki/kafka
+    ports:
+      - "127.0.0.1:9090:8080"
+    depends_on:
+      - kafka
+
+volumes:
+  kafka-data: {}
+  kafka-config: {}
+
+networks:
+  default:
+    external: true
+    name: observability
