@@ -33,6 +33,8 @@ subjectAltName = @alt_names
 [ alt_names ]
 DNS.1 = localhost
 DNS.2 = kafka
+DNS.3 = kafka2
+DNS.4 = kafka3
 IP.1 = 127.0.0.1
 EOF
 

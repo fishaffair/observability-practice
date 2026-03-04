@@ -1,38 +1,73 @@
+x-kafka-common: &kafka-common
+    image: confluentinc/cp-kafka
+    expose:
+      - 9092
+      - 9093
+      - 9094
+
+x-kafka-env: &kafka-env
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SSL,CONTROLLER:SSL,EXTERNAL:SSL
+    CLUSTER_ID: "ZDBDb_MbS7Ch8e57mQGcbA"
+    KAFKA_PROCESS_ROLES: "broker,controller"
+    KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9094,2@kafka2:9094,3@kafka3:9094"
+    KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+    KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9094,EXTERNAL://:9093
+    KAFKA_SSL_KEYSTORE_TYPE: "PEM"
+    KAFKA_SSL_TRUSTSTORE_TYPE: "PEM"
+    KAFKA_SSL_KEYSTORE_LOCATION: "/etc/kafka/secrets/broker-keypair.pem"
+    KAFKA_SSL_TRUSTSTORE_LOCATION: "/etc/kafka/secrets/ca-cert.pem"
+    KAFKA_SSL_CLIENT_AUTH: "required"
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+    KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+    KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+    KAFKA_DEFAULT_REPLICATION_FACTOR: "3"
+    KAFKA_NUM_PARTITIONS: "3"
+    KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: true
+    KAFKA_LOG4J_ROOT_LOGLEVEL: WARN
+    KAFKA_SUPER_USERS: "User:CN=kafka-broker"
+    KAFKA_AUTHORIZER_CLASS_NAME: "org.apache.kafka.metadata.authorizer.StandardAuthorizer"
+
 name: kafka
 services:
 
   kafka:
+    <<: *kafka-common
     container_name: kafka
-    image: confluentinc/cp-kafka
-    # image: apache/kafka
     environment:
-      KAFKA_NODE_ID: "1"
-      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9094"
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9094,EXTERNAL://:9093
-      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://kafka:9093,INTERNAL://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SSL,CONTROLLER:SSL,EXTERNAL:SSL
-      KAFKA_SSL_KEYSTORE_TYPE: "PEM"
-      KAFKA_SSL_TRUSTSTORE_TYPE: "PEM"
-      KAFKA_SSL_KEYSTORE_LOCATION: "/etc/kafka/secrets/broker-keypair.pem"
-      KAFKA_SSL_TRUSTSTORE_LOCATION: "/etc/kafka/secrets/ca-cert.pem"
-      KAFKA_SSL_CLIENT_AUTH: "required"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
-      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: true
-      KAFKA_LOG4J_ROOTLOGGER: WARN
-      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
-
-    ports:
-    - "127.0.0.1:9093:9093"
+      KAFKA_NODE_ID: 1
+      KAFKA_BROKER_ID: 1
+      KAFKA_ADVERTISED_LISTENERS: CONTROLLER://kafka:9094,INTERNAL://kafka:9092,EXTERNAL://kafka:9093
+      <<: *kafka-env
     volumes:
     - "./certs:/etc/kafka/secrets:ro"
     - "kafka-data:/var/lib/kafka/data"
     - "kafka-config:/mnt/shared/config"
+  kafka2:
+    <<: *kafka-common
+    container_name: kafka2
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_BROKER_ID: 2
+      KAFKA_ADVERTISED_LISTENERS: CONTROLLER://kafka2:9094,INTERNAL://kafka2:9092,EXTERNAL://kafka2:9093
+      <<: *kafka-env
+    volumes:
+    - "./certs:/etc/kafka/secrets:ro"
+    - "kafka2-data:/var/lib/kafka/data"
+    - "kafka-config:/mnt/shared/config"
+  kafka3:
+    <<: *kafka-common
+    container_name: kafka3
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_BROKER_ID: 3
+      KAFKA_ADVERTISED_LISTENERS: CONTROLLER://kafka3:9094,INTERNAL://kafka3:9092,EXTERNAL://kafka3:9093
+      <<: *kafka-env
+    volumes:
+    - "./certs:/etc/kafka/secrets:ro"
+    - "kafka3-data:/var/lib/kafka/data"
+    - "kafka3-config:/mnt/shared/config"
+
   vector-producer:
     image: timberio/vector:nightly-alpine
     container_name: vector-producer
@@ -83,6 +118,10 @@ services:
 volumes:
   kafka-data: {}
   kafka-config: {}
+  kafka2-data: {}
+  kafka2-config: {}
+  kafka3-data: {}
+  kafka3-config: {}
 
 networks:
   default:

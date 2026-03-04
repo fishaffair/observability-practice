@@ -1,6 +1,8 @@
 kafka:
   brokers:
     - "kafka:9093"
+    - "kafka2:9093"
+    - "kafka3:9093"
   tls:
     enabled: true
     caFilepath: "/etc/pki/kafka/ca-cert.pem"
