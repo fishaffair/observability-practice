@@ -1,0 +1,53 @@
+api:
+  enabled: false
+
+data_dir: /var/lib/vector
+
+sources:
+  docker_logs:
+    type: docker_logs
+    include_labels:
+      - vector.enabled=true
+
+transforms:
+  docker_parser:
+    type: remap
+    inputs: 
+      - docker_logs # Delete unused labels
+    source: |
+        del(.container_created_at)
+        del(.container_id)
+        del(.stream)
+        del(.source_type)
+        del(.label."com.docker.compose.image")
+        del(.label."com.docker.compose.oneoff")
+        del(.label."com.docker.compose.depends_on")
+        del(.label."com.docker.compose.version")
+        del(.label."com.docker.compose.container-number")
+        del(.label."com.docker.compose.config-hash")
+        del(.label."com.docker.compose.project.config_files")
+        del(.label."com.docker.compose.project.working_dir")
+        del(.label."com.docker.compose.replace")
+        err, err = parse_json(.message)
+        if err == null {
+          .message = parse_json!(string!(.message))
+        }
+
+sinks:
+  rabbit:
+    type: amqp
+    inputs: ["docker_parser"]
+    connection_string: amqp://vector:vector@rabbitmq-1:5672/%2f?timeout=10
+    compression: snappy
+    routing_key: "{{ message.method }}"
+    exchange: vector
+    encoding:
+      codec: json
+      pretty: true
+
+  log_console:
+    type: console
+    inputs: ["docker_parser"]
+    encoding:
+      codec: json
+      pretty: true

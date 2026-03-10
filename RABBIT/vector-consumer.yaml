@@ -1,0 +1,54 @@
+api:
+  enabled: false
+
+data_dir: /var/lib/vector
+
+sources:
+  rabbit-get:
+    type: amqp
+    connection_string: amqp://vector:vector@rabbitmq-1:5672/%2f?timeout=10
+    consumer: vector-get
+    offset_key: offset
+    prefetch_count: 100
+    queue: vector_get
+  rabbit-post:
+    type: amqp
+    connection_string: amqp://vector:vector@rabbitmq-2:5672/%2f?timeout=10
+    consumer: vector-post
+    offset_key: offset
+    prefetch_count: 100
+    queue: vector_post
+  rabbit-put:
+    type: amqp
+    connection_string: amqp://vector:vector@rabbitmq-3:5672/%2f?timeout=10
+    consumer: vector-put
+    offset_key: offset
+    prefetch_count: 100
+    queue: vector_put
+
+transforms:
+  parse_rabbitmq_payload:
+    type: remap
+    inputs:
+      - rabbit-get
+      - rabbit-post
+      - rabbit-put
+    source: |
+      parsed, err = parse_json(.message)
+      if err == null {
+          del(.message)
+          . = merge!(., parsed) 
+      }
+
+sinks:
+  file:
+    type: file
+    inputs:
+      - parse_rabbitmq_payload
+    compression: none
+    idle_timeout_secs: 30
+    path: "/tmp/flog-{{ routing }}.log"
+    timezone: local
+    encoding:
+      codec: json
+      pretty: true

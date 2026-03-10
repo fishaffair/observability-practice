@@ -1,0 +1,96 @@
+x-rabbitmq-defaults: &rabbitmq-defaults
+  environment:
+    RABBITMQ_ERLANG_COOKIE: RABBITMQ_ERLANG_COOKIE
+  expose:
+    - 5672
+  networks: 
+    observability:
+      aliases:
+        - rabbitmq
+
+name: rabbitmq
+services:
+  vector-producer:
+    restart: unless-stopped
+    image: timberio/vector:nightly-alpine
+    container_name: vector-producer
+    volumes:
+      - ./vector-producer.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # - ./certs:/etc/pki/rabbitmq
+    depends_on:
+      - rabbitmq-1
+      - rabbitmq-2
+      - rabbitmq-3
+    networks:
+      - observability
+  vector-consumer:
+    restart: unless-stopped
+    image: timberio/vector:nightly-alpine
+    container_name: vector-consumer
+    volumes:
+      - ./vector-consumer.yaml:/etc/vector/vector.yaml:ro
+      # - ./certs:/etc/pki/rabbitmq
+    depends_on:
+      - rabbitmq-1
+      - rabbitmq-2
+      - rabbitmq-3
+    networks:
+      - observability
+  log-generator:
+    image: mingrammer/flog
+    container_name: flog
+    labels:
+      - vector.enabled=true
+    command:
+      - --format=json
+      - --loop
+      - --number=10
+      - --delay=5000ms
+    depends_on:
+      - vector-producer
+    networks:
+      - observability
+
+  rabbitmq-1:
+    image: rabbitmq:management
+    hostname: rabbitmq-1
+    container_name: rabbitmq-1
+    volumes:
+     - rabbitmq1-data:/var/lib/rabbitmq
+     - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+     - ./definitions.json:/etc/rabbitmq/definitions.json:ro
+    ports:
+        - 127.0.0.1:15672:15672
+    <<: *rabbitmq-defaults
+  rabbitmq-2:
+    image: rabbitmq:management
+    hostname: rabbitmq-2
+    container_name: rabbitmq-2
+    environment:
+      RABBITMQ_ERLANG_COOKIE: RABBITMQ_ERLANG_COOKIE
+    volumes:
+     - rabbitmq2-data:/var/lib/rabbitmq
+     - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+     - ./definitions.json:/etc/rabbitmq/definitions.json:ro
+    <<: *rabbitmq-defaults
+
+  rabbitmq-3:
+    image: rabbitmq:management
+    hostname: rabbitmq-3
+    container_name: rabbitmq-3
+    volumes:
+     - rabbitmq3-data:/var/lib/rabbitmq
+     - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+     - ./definitions.json:/etc/rabbitmq/definitions.json:ro
+    <<: *rabbitmq-defaults
+
+volumes:
+  rabbitmq1-data: {}
+  rabbitmq2-data: {}
+  rabbitmq3-data: {}
+
+networks:
+  observability:
+    external: true
+    name: observability
