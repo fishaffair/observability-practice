@@ -1,0 +1,21 @@
+api:
+  enabled: false
+
+data_dir: /var/lib/vector
+
+sources:
+  kafka_source:
+    type: kafka
+    bootstrap_servers: "redpanda-2:9092"
+    group_id: "vector-readers"
+    topics: ["logs-topic"]
+    tls:
+     enabled: false
+
+sinks:
+  log_console:
+    type: console
+    inputs: ["kafka_source"]
+    encoding:
+      codec: json
+

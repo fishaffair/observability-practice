@@ -1,4 +1,4 @@
-## Kafka + RabbitMQ
+## Vector + RabbitMQ
 
 Демонстрация работы RabbitMQ с Vector для обработки логов.
 
@@ -7,6 +7,8 @@
 ```shell
 docker compose up -d
 ```
+
+Веб панель кластера RabbitMQ будет на порту `15672`
 
 ## Схема взаимодействия
 

@@ -1,0 +1,185 @@
+
+
+name: redpanda
+
+services:
+  redpanda-0:
+    image: docker.redpanda.com/redpandadata/redpanda:v25.3.9
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda-0:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda-0:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr redpanda-0:33145
+      - --advertise-rpc-addr redpanda-0:33145
+      - --default-log-level=info
+      - --smp 1
+    container_name: redpanda-0
+    hostname: redpanda-0
+    volumes:
+      - redpanda-0:/var/lib/redpanda/data
+    ports:
+      - 127.0.0.1:18081:18081
+      - 127.0.0.1:18082:18082
+      - 127.0.0.1:19092:19092
+      - 127.0.0.1:19644:9644
+
+  redpanda-1:
+    image: docker.redpanda.com/redpandadata/redpanda:v25.3.9
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:29092
+      - --advertise-kafka-addr internal://redpanda-1:9092,external://localhost:29092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:28082
+      - --advertise-pandaproxy-addr internal://redpanda-1:8082,external://localhost:28082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:28081
+      - --rpc-addr redpanda-1:33145
+      - --advertise-rpc-addr redpanda-1:33145
+      - --default-log-level=info
+      - --seeds redpanda-0:33145
+      - --smp 1
+    container_name: redpanda-1
+    hostname: redpanda-1
+    volumes:
+      - redpanda-1:/var/lib/redpanda/data
+    ports:
+      - 127.0.0.1:28081:28081
+      - 127.0.0.1:28082:28082
+      - 127.0.0.1:29092:29092
+      - 127.0.0.1:29644:9644
+    depends_on:
+      - redpanda-0
+
+  redpanda-2:
+    image: docker.redpanda.com/redpandadata/redpanda:v25.3.9
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:39092
+      - --advertise-kafka-addr internal://redpanda-2:9092,external://localhost:39092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:38082
+      - --advertise-pandaproxy-addr internal://redpanda-2:8082,external://localhost:38082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:38081
+      - --rpc-addr redpanda-2:33145
+      - --advertise-rpc-addr redpanda-2:33145
+      - --default-log-level=info
+      - --seeds redpanda-0:33145
+      - --smp 1
+    container_name: redpanda-2
+    hostname: redpanda-2
+    volumes:
+      - redpanda-2:/var/lib/redpanda/data
+
+    ports:
+      - 127.0.0.1:38081:38081
+      - 127.0.0.1:38082:38082
+      - 127.0.0.1:39092:39092
+      - 127.0.0.1:39644:9644
+    depends_on:
+      - redpanda-0
+
+  console:
+    container_name: redpanda-console
+    image: docker.redpanda.com/redpandadata/console:v3.6.0
+    entrypoint: /bin/sh
+    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: 
+           - redpanda-0:9092
+           - redpanda-1:9092
+           - redpanda-2:9092
+        schemaRegistry:
+          enabled: true
+          urls: ["http://redpanda-0:8081"]
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://redpanda-0:9644"]
+    ports:
+      - 127.0.0.1:8080:8080
+    depends_on:
+      - redpanda-0
+      - redpanda-1
+      - redpanda-2
+
+  vector-producer:
+    image: timberio/vector:nightly-alpine
+    container_name: vector-producer
+    volumes:
+      - ./vector-producer.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - redpanda-0
+  vector-consumer:
+    image: timberio/vector:nightly-alpine
+    container_name: vector-consumer
+    volumes:
+      - ./vector-consumer.yaml:/etc/vector/vector.yaml:ro
+    depends_on:
+      - redpanda-0
+
+  log-generator:
+    image: mingrammer/flog
+    container_name: flog
+    labels:
+      - vector.enabled=true
+    command:
+      - --format=json
+      - --loop
+      - --number=100
+      - --delay=2000ms
+    depends_on:
+      - vector-producer
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - 127.0.0.1:9090:9090
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_BASIC_ENABLED=false
+    ports:
+      - 127.0.0.1:3000:3000
+    entrypoint:
+       - sh
+       - -euc
+       - |
+         mkdir -p /etc/grafana/provisioning/datasources
+         cat <<EOF > /etc/grafana/provisioning/datasources/entity.yaml
+         apiVersion: 1
+         datasources:
+         - name: Prometheus
+           type: prometheus
+           access: proxy
+           orgId: 1
+           url: 'http://prometheus:9090'
+           isDefault: true
+           version: 1
+         EOF
+         /run.sh
+    depends_on:
+      - prometheus
+
+networks:
+  default:
+    external: true
+    name: observability
+volumes:
+  redpanda-0: {}
+  redpanda-1: {}
+  redpanda-2: {}
