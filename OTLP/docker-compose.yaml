@@ -18,12 +18,12 @@ services:
       - openobserve
   alloy:
     hostname: floral
-    image: grafana/alloy:latest
+    image: grafana/alloy:2.10.0
     container_name: alloy
     restart: unless-stopped
     volumes:
-      - ./config.alloy:/etc/alloy/config.alloy:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config.alloy:/etc/alloy/config.alloy:Z
+      - /var/run/docker.sock:/var/run/docker.sock:Z
     environment:
       - ZO_TOKEN=${ZO_TOKEN}
     ports:
@@ -61,9 +61,9 @@ services:
     environment:
       - ZO_TOKEN=${ZO_TOKEN}
     volumes:
-      - ./otlp.yaml:/etc/otelcol-contrib/config.yaml:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./otlp.yaml:/etc/otelcol-contrib/config.yaml:Z
+      - /var/lib/docker/containers:/var/lib/docker/containers:Z
+      - /var/run/docker.sock:/var/run/docker.sock:Z
     ports:
       - "127.0.0.1:4317:4317"   # OTLP gRPC for apps
       - "127.0.0.1:4318:4318"   # OTLP HTTP
@@ -74,6 +74,22 @@ services:
     profiles:
       - otlp-collector
 
+  otlp-collector-multitenant:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    volumes:
+      - ./otlp-multitenant.yaml:/etc/otelcol-contrib/config.yaml:Z
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    networks:
+       otlp:
+        aliases:
+        - collector
+    profiles:
+      - otlp-collector-multitenant
+
   vector:
     image: timberio/vector:nightly-2025-11-01-alpine
     container_name: vector
@@ -81,7 +97,7 @@ services:
       - ZO_PASSWORD=${ZO_PASSWORD}
       - VECTOR_INTERNAL_LOG_RATE_LIMIT=1 # For debug
     volumes:
-      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - ./vector.yaml:/etc/vector/vector.yaml:Z
     ports:
       - "127.0.0.1:8686:8686"
       - "127.0.0.1:4318:4318" # OTLP gRPC
@@ -103,6 +119,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+      - GF_LOG_LEVEL=error
     ports:
       - "127.0.0.1:3000:3000"
     networks: [otlp]
@@ -151,10 +168,10 @@ services:
 
   tempo:
     container_name: tempo
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.10.0
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
+      - ./tempo.yaml:/etc/tempo.yaml:Z
       - tempodata:/var/tempo
     ports:
       - "127.0.0.1:3200:3200" # tempo ui

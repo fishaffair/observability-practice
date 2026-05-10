@@ -1,0 +1,46 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        include_metadata: true
+
+processors:
+  attributes/tenant:
+    actions:
+      - key: tenant.id
+        action: upsert
+        from_context: metadata.x-tenant-name
+
+  batch:
+    metadata_keys:
+      - x-tenant-name
+
+exporters:
+  debug:
+    verbosity: detailed
+
+  otlphttp/tempo:
+    endpoint: http://tempo:4444
+    auth:
+      authenticator: headers_setter
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  headers_setter:
+    headers:
+      - action: upsert
+        key: X-Scope-OrgID
+        from_context: x-tenant-name
+
+service:
+  extensions: [health_check, headers_setter]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes/tenant, batch]
+      exporters: [debug, otlphttp/tempo]
