@@ -71,8 +71,7 @@ customConfig:
       type: loki
       compression: snappy
       encoding:
-        codec: json
-        pretty: true
+        codec: text
       remove_label_fields: true
       remove_structured_metadata_fields: true
       remove_timestamp: true
